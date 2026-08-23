@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.data
+package com.phonetopc.copycode.data
 
 import android.content.Context
 import android.content.SharedPreferences

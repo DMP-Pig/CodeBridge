@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "phonetopccopycode-pc",
   "productName": "PhoneToPCCopyCode",
   "version": "0.1.0-beta.1",
@@ -27,16 +27,19 @@
       "package.json"
     ],
     "win": {
+      "icon": "assets/icon.png",
       "target": [
         { "target": "nsis", "arch": ["x64"] },
         { "target": "portable", "arch": ["x64"] }
       ]
     },
     "mac": {
+      "icon": "assets/icon.png",
       "target": ["dmg"],
       "category": "public.app-category.utilities"
     },
     "linux": {
+      "icon": "assets/icon.png",
       "target": ["AppImage", "deb"],
       "category": "Utility"
     },

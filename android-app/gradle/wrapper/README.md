@@ -1,4 +1,4 @@
-﻿# Gradle Wrapper
+# Gradle Wrapper
 
 本目录的 `gradle-wrapper.jar` 需在首次构建时生成（本环境无法联网下载 Gradle 发行版）。
 

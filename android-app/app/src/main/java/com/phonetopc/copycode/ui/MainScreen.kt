@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.ui
+package com.phonetopc.copycode.ui
 
 import android.content.ComponentName
 import android.content.Context

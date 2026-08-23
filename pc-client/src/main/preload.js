@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 预加载脚本：通过 contextBridge 向渲染进程暴露安全 API。
  */
 const { contextBridge, ipcRenderer } = require('electron');

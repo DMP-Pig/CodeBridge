@@ -1,4 +1,4 @@
-﻿# Node
+# Node
 node_modules/
 npm-debug.log*
 yarn-error.log*
@@ -22,3 +22,12 @@ desktop.ini
 # Local sensitive data
 *.local.json
 settings.local.json
+
+# 发布产物（Beta 版本仅本地保留，不进入版本库）
+releases/**/*.apk
+releases/**/*.exe
+releases/**/*.blockmap
+releases/**/*.zip
+releases/**/*.dmg
+releases/**/*.AppImage
+releases/**/*.deb

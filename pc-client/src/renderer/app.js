@@ -1,4 +1,4 @@
-﻿/* PhoneToPCCopyCode · 渲染进程 UI 逻辑 */
+/* PhoneToPCCopyCode · 渲染进程 UI 逻辑 */
 const api = window.p2p;
 
 const $ = (sel) => document.querySelector(sel);

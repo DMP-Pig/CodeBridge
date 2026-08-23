@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.service
+package com.phonetopc.copycode.service
 
 import android.content.BroadcastReceiver
 import android.content.Context

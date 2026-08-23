@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.data
+package com.phonetopc.copycode.data
 
 /**
  * 从短信文本中提取验证码。

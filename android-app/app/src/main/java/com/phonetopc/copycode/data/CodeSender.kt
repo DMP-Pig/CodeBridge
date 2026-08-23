@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.data
+package com.phonetopc.copycode.data
 
 import org.json.JSONObject
 import java.io.IOException

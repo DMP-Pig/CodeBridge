@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.service
+package com.phonetopc.copycode.service
 
 import android.app.Notification
 import android.service.notification.NotificationListenerService

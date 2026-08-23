@@ -1,8 +1,26 @@
-﻿# PhoneToPCCopyCode · 手机验证码 → PC 桥接
+# PhoneToPCCopyCode · 手机验证码 → PC 桥接
 
 手机收到短信验证码后，通过**局域网**自动传送到 PC，PC 端以液态玻璃风格界面展示，
 并可一键「上岛」（推送到 WinIsland 灵动岛）或「复制到剪贴板」。所有行为均可配置。
 
+## 目录结构（PC 端与手机端代码分开存放）
+
+```
+PhoneToPCCopyCode/
+├── pc-client/            ← PC 端（Windows / macOS / Linux，Electron）
+│   ├── src/main/         主进程（局域网服务、上岛、剪贴板、设置）
+│   └── src/renderer/     液态玻璃 UI（index.html / styles.css / app.js）
+├── android-app/          ← 手机端（Android APK，Kotlin + Jetpack Compose）
+│   ├── app/src/main/java/.../data      设置、验证码提取、发送
+│   ├── app/src/main/java/.../service   通知监听、短信广播
+│   ├── app/src/main/java/.../ui        Compose 界面
+│   └── app/src/main/res/               资源与图标
+├── docs/                 文档（架构 / 协议 / 构建）
+├── releases/<版本号>/     发布产物（APK、PC 安装包等）
+└── README.md
+```
+
+两个客户端互相独立、互不依赖：PC 端只负责接收与展示，手机端只负责采集与发送，通过局域网 HTTP 通信（见 `docs/协议说明.md`）。
 ## 客户端
 
 | 平台 | 技术栈 | 目录 |
@@ -29,8 +47,12 @@ npm start
 
 ## 当前状态（0.1.0beta1）
 
-- PC 端已在本机验证：局域网服务、验证码展示、剪贴板复制（手动/自动/灵动岛按钮）、WinIsland 上岛推送均通过实测。
-- 手机端为完整 Android Studio 工程源码，需在装有 Android SDK 的机器上构建 APK（本环境无法联网下载 Android 依赖）。
+- **两端产物均已构建**，位于 `releases/0.1.0beta1/`：
+  - `PhoneToPCCopyCode-0.1.0beta1-android.apk`（手机端）
+  - `PhoneToPCCopyCode-0.1.0beta1-windows-installer.exe`（PC 安装包）
+  - `PhoneToPCCopyCode-0.1.0beta1-windows-x64-portable.exe`（PC 便携版）
+- PC 端已实测：局域网服务、验证码展示、剪贴板复制（手动/自动/灵动岛按钮）、WinIsland 上岛推送均通过。
+- 手机端 APK 已用本机 SDK + Gradle 8.8 + 阿里云镜像实测编译成功（debug 版可直接安装）。
 - 测试方法：`cd pc-client && npm start`，然后 `curl -X POST http://127.0.0.1:9841/api/code -H "Content-Type: application/json" -d '{"code":"123456"}'`。
 
 ## 与 WinIsland 联动

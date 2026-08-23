@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.ui.theme
+package com.phonetopc.copycode.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * PhoneToPCCopyCode · PC 端主进程
  * 职责：局域网 HTTP 服务（接收手机推送的验证码）、设置持久化、
  *       WinIsland 上岛推送、剪贴板、窗口/托盘管理。

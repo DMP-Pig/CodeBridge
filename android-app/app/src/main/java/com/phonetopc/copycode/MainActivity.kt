@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode
+package com.phonetopc.copycode
 
 import android.Manifest
 import android.os.Build
