@@ -135,13 +135,21 @@ function islandHeaders() {
   return h;
 }
 
+/**
+ * 把设置中的 "\uXXXX" 转义（如 "\uE8D6"）解码为真正的 Unicode 字形字符；
+ * 连续两个转义可组成代理对（emoji，如 "\uD83D\uDD11" → 🔑）。
+ */
+function decodeIconEscape(s) {
+  if (typeof s !== 'string') return s;
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
 function pushToIsland(entry) {
   return new Promise((resolve, reject) => {
     const base = (settings.island.baseUrl || 'http://127.0.0.1:9840').replace(/\/+$/, '');
     const payload = {
       title: '短信验证码',
       body: `验证码：${entry.code}${entry.app ? `\n来源：${entry.app}` : ''}${entry.source ? `\n号码：${entry.source}` : ''}`,
-      icon: settings.island.icon || '\\uE8D6',
+      icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
       duration_seconds: Number(settings.island.durationSeconds) || 30,
       id: `phonetopc-${entry.id}`,
       buttons: [
@@ -466,6 +474,13 @@ async function runVerify() {
         errors: window.__p2pErrors || [],
       };
     })()`);
+    // 走真实上岛流程（与点击「上岛」按钮完全一致）
+    let islandRes = { ok: false, error: '未执行' };
+    if (codeHistory[0]) {
+      try { await pushToIsland(codeHistory[0]); islandRes = { ok: true }; }
+      catch (err) { islandRes = { ok: false, error: err.message }; }
+    }
+    result.islandPush = islandRes;
     console.log('VERIFY_RESULT ' + JSON.stringify(result));
     const img = await mainWindow.webContents.capturePage();
     const outPath = VERIFY_SHOT
