@@ -147,12 +147,12 @@ function decodeIconEscape(s) {
  * 构建上岛卡片载荷（单行、不拓宽灵动岛）。
  */
 function buildIslandPayload(entry) {
-  const bodyParts = [];
+  const bodyParts = ['验证码'];
   if (entry.app) bodyParts.push(`来自 ${entry.app}`);
   if (entry.source) bodyParts.push(entry.source);
   return {
-    title: `验证码 ${entry.code}`,
-    body: bodyParts.join(' '),
+    title: `${entry.code}`,           // 紧凑标题只放验证码，保证固定宽度内完整显示
+    body: bodyParts.join(' · '),      // 展开态正文：验证码 · 来自 X · Y（单行）
     icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
     duration_seconds: Number(settings.island.durationSeconds) || 30,
     id: `phonetopc-${entry.id}`,
@@ -513,9 +513,11 @@ async function runVerify() {
       catch (err) { islandRes = { ok: false, error: err.message }; }
     }
     if (codeHistory[0]) {
-      result.islandNeedPx = estimateIslandNeed(codeHistory[0]);
       const pl = buildIslandPayload(codeHistory[0]);
+      result.islandTitlePx = measureTextWidth(pl.title, 13, 7);   // 紧凑标题宽度（MaxWidth=150）
+      result.islandBodyPx = pl.body ? measureTextWidth(pl.body, 13.5, 7) : 0;
       result.islandSingleLine = !pl.title.includes('\n') && !pl.body.includes('\n');
+      result.islandPayload = { title: pl.title, body: pl.body, button: pl.buttons[0].label };
     }
     result.islandPush = islandRes;
     console.log('VERIFY_RESULT ' + JSON.stringify(result));
