@@ -3,18 +3,13 @@
 > 依据《通用文件管理要求》：Beta / 迭代版本不上传远端，仅本地保留。
 > 发布二进制不进入版本库（见 `.gitignore`），如需重新生成见 `docs/构建指南.md`。
 
-## 已构建产物（本目录）
+## 已构建产物（本目录，全部为最新）
 
-| 文件 | 平台 | 类型 | 大小 | 状态 |
-|---|---|---|---|---|
-| `PhoneToPCCopyCode-1.0.0beta1-android.apk` | Android | APK（debug，可直接安装） | 17 MB | 最新 |
-| `PhoneToPCCopyCode-1.0.0beta1-windows-installer.exe` | Windows x64 | NSIS 安装包 | 75 MB | 最新 |
-| `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe` | Windows x64 | 便携版（免安装） | 75 MB | ⚠ 旧版，正在运行占用，见下 |
-| `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe.new` | Windows x64 | 便携版（新，单行上岛修复） | 75 MB | 最新 |
-
-> 便携版替换步骤：先关闭正在运行的便携版窗口，然后删除旧
-> `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe`，把
-> `...portable.exe.new` 改名为 `...portable.exe`（或直接运行 `.new` 文件）。
+| 文件 | 平台 | 类型 | 大小 |
+|---|---|---|---|
+| `PhoneToPCCopyCode-1.0.0beta1-android.apk` | Android | APK（debug，可直接安装） | 17 MB |
+| `PhoneToPCCopyCode-1.0.0beta1-windows-installer.exe` | Windows x64 | NSIS 安装包 | 75 MB |
+| `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe` | Windows x64 | 便携版（免安装） | 75 MB |
 
 ## 1.0.0beta1 变更
 
