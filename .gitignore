@@ -1,0 +1,24 @@
+﻿# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Build outputs
+pc-client/dist/
+pc-client/build/
+android-app/app/build/
+android-app/build/
+android-app/.gradle/
+android-app/local.properties
+android-app/.idea/
+android-app/captures/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local sensitive data
+*.local.json
+settings.local.json

@@ -1,0 +1,497 @@
+﻿package com.phonetopc.copycode.ui
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.phonetopc.copycode.data.CodeSender
+import com.phonetopc.copycode.data.Settings
+import com.phonetopc.copycode.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+/**
+ * 主界面：液态玻璃风格 + 服务配置 + 权限状态。
+ */
+@Composable
+fun MainScreen() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val settings = remember { Settings.get() }
+
+    // 表单状态
+    var host by remember { mutableStateOf(settings.pcHost) }
+    var port by remember { mutableStateOf(settings.pcPort.toString()) }
+    var token by remember { mutableStateOf(settings.token) }
+    var autoSend by remember { mutableStateOf(settings.autoSend) }
+    var customRegex by remember { mutableStateOf(settings.customRegex) }
+    var statusMsg by remember { mutableStateOf("就绪") }
+    var statusOk by remember { mutableStateOf(true) }
+
+    val listenerEnabled = remember {
+        isNotificationAccessEnabled(context)
+    }
+    val smsGranted = remember {
+        ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { }
+
+    // 背景光斑动画
+    val transition = rememberInfiniteTransition(label = "blob")
+    val drift1 by transition.animateFloat(
+        initialValue = -80f, targetValue = 80f,
+        animationSpec = infiniteRepeatable(tween(7000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "drift1",
+    )
+    val drift2 by transition.animateFloat(
+        initialValue = 60f, targetValue = -70f,
+        animationSpec = infiniteRepeatable(tween(9000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "drift2",
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color(0xFF0A0F1F), Color(0xFF0D1326), Color(0xFF0A0E1C))
+                )
+            )
+    ) {
+        // 光斑
+        Box(
+            Modifier
+                .offset(x = drift1.dp, y = (-80).dp)
+                .size(340.dp)
+                .align(Alignment.TopStart)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0x66608CFF), Color.Transparent),
+                        radius = 340f,
+                    ),
+                    CircleShape,
+                )
+        )
+        Box(
+            Modifier
+                .offset(x = drift2.dp, y = 120.dp)
+                .size(320.dp)
+                .align(Alignment.TopEnd)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0x55AA6EFF), Color.Transparent),
+                        radius = 320f,
+                    ),
+                    CircleShape,
+                )
+        )
+        Box(
+            Modifier
+                .offset(x = 0.dp, y = drift1.dp)
+                .size(380.dp)
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.radialGradient(
+                        listOf(Color(0x4028D2DC), Color.Transparent),
+                        radius = 380f,
+                    ),
+                    CircleShape,
+                )
+        )
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            // 标题
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("验证码桥接", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                    Text("手机 → PC · 局域网实时转发", color = TextFaint, fontSize = 13.sp)
+                }
+                GlassPill(
+                    text = if (listenerEnabled) "监听中" else "未监听",
+                    color = if (listenerEnabled) Ok else Warn,
+                )
+            }
+
+            // 服务配置卡片
+            GlassCard {
+                CardHeader(Icons.Default.Settings, "PC 接收端")
+                GlassTextField(host, { host = it }, "PC 地址（IP 或主机名）", "192.168.1.100")
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassTextField(
+                        value = port,
+                        onValueChange = { v -> port = v.filter { it.isDigit() }.take(5) },
+                        label = "端口",
+                        placeholder = "9841",
+                        modifier = Modifier.weight(1f),
+                    )
+                    GlassTextField(
+                        value = token,
+                        onValueChange = { token = it },
+                        label = "Token（可留空）",
+                        placeholder = "与 PC 端一致",
+                        modifier = Modifier.weight(1.6f),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                ToggleRow(
+                    title = "自动转发",
+                    desc = "收到验证码后自动发送到 PC",
+                    checked = autoSend,
+                    onCheckedChange = { autoSend = it },
+                )
+                ToggleRow(
+                    title = "自定义正则（可选）",
+                    desc = "留空使用内置中文短信规则",
+                    checked = customRegex.isNotEmpty(),
+                    onCheckedChange = { if (it) customRegex = "\\d{6}" else customRegex = "" },
+                )
+                if (customRegex.isNotEmpty()) {
+                    GlassTextField(
+                        value = customRegex,
+                        onValueChange = { customRegex = it },
+                        label = "验证码正则",
+                        placeholder = "\\d{6}",
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassButton(
+                        text = "保存",
+                        icon = Icons.Default.Check,
+                        accent = true,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        settings.pcHost = host
+                        settings.pcPort = port.toIntOrNull() ?: Settings.DEFAULT_PORT
+                        settings.token = token
+                        settings.autoSend = autoSend
+                        settings.customRegex = customRegex
+                        statusMsg = if (settings.isValid()) "设置已保存" else "请填写 PC 地址"
+                        statusOk = settings.isValid()
+                    }
+                    GlassButton(
+                        text = "发送测试码",
+                        icon = Icons.Default.Send,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        settings.pcHost = host
+                        settings.pcPort = port.toIntOrNull() ?: Settings.DEFAULT_PORT
+                        settings.token = token
+                        if (!settings.isValid()) {
+                            statusMsg = "请先填写 PC 地址"
+                            statusOk = false
+                            return@GlassButton
+                        }
+                        statusMsg = "发送中…"
+                        scope.launch {
+                            val result = withContext(Dispatchers.IO) {
+                                CodeSender.send(settings.pcHost, settings.pcPort, settings.token, "123456", "测试", "0000")
+                            }
+                            statusMsg = result.message
+                            statusOk = result.ok
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = if (statusOk) "✓ $statusMsg" else "✗ $statusMsg",
+                    color = if (statusOk) Ok else Danger,
+                    fontSize = 12.5.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+
+            // 权限卡片
+            GlassCard {
+                CardHeader(Icons.Default.Notifications, "权限与监听")
+                PermissionRow(
+                    title = "通知使用权",
+                    desc = if (listenerEnabled) "已开启，可读取短信验证码通知" else "用于读取短信验证码通知",
+                    enabled = listenerEnabled,
+                ) {
+                    openNotificationAccessSettings(context)
+                }
+                Spacer(Modifier.height(8.dp))
+                PermissionRow(
+                    title = "短信权限（备用）",
+                    desc = if (smsGranted) "已授予" else "未授予（可选，通知监听足够时可不授）",
+                    enabled = smsGranted,
+                ) {
+                    val perms = mutableListOf(android.Manifest.permission.RECEIVE_SMS)
+                    if (Build.VERSION.SDK_INT >= 33) perms.add(android.Manifest.permission.POST_NOTIFICATIONS)
+                    permissionLauncher.launch(perms.toTypedArray())
+                }
+            }
+
+            // 使用说明
+            GlassCard {
+                CardHeader(Icons.Default.Sms, "使用步骤")
+                Text(
+                    text = "1. 在 PC 端启动 PhoneToPCCopyCode，记录端口与 Token\n" +
+                        "2. 在上方填写 PC 局域网地址（同一 WiFi 下）\n" +
+                        "3. 开启「通知使用权」，授予短信权限\n" +
+                        "4. 保持「自动转发」开启，收到验证码即自动上送",
+                    color = TextDim,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                )
+            }
+        }
+    }
+}
+
+/* ---------------- 组件 ---------------- */
+
+@Composable
+private fun GlassCard(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(18.dp, RoundedCornerShape(28.dp), clip = false)
+            .clip(RoundedCornerShape(28.dp))
+            .background(
+                Brush.linearGradient(
+                    listOf(GlassCardStrong, GlassCard),
+                    start = androidx.compose.ui.geometry.Offset.Zero,
+                    end = androidx.compose.ui.geometry.Offset(400f, 400f),
+                )
+            )
+            .border(BorderStroke(1.dp, GlassBorder), RoundedCornerShape(28.dp))
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun CardHeader(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
+        Box(
+            Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0x2E6EA8FF)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = Accent, modifier = Modifier.size(16.dp))
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(title, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun GlassTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        label = { Text(label, fontSize = 12.sp) },
+        placeholder = { Text(placeholder, color = TextFaint, fontSize = 12.sp) },
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Accent,
+            unfocusedBorderColor = GlassBorder,
+            focusedLabelColor = Accent,
+            unfocusedLabelColor = TextFaint,
+            cursorColor = Accent,
+            focusedTextColor = TextPrimary,
+            unfocusedTextColor = TextPrimary,
+            focusedContainerColor = Color(0x0FFFFFFF),
+            unfocusedContainerColor = Color(0x0FFFFFFF),
+        ),
+        shape = RoundedCornerShape(14.dp),
+        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.5.sp),
+    )
+}
+
+@Composable
+private fun ToggleRow(
+    title: String,
+    desc: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = TextPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+            Text(desc, color = TextFaint, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Accent,
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color(0x33FFFFFF),
+                uncheckedBorderColor = GlassBorder,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun PermissionRow(
+    title: String,
+    desc: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color(0x0FFFFFFF))
+            .border(BorderStroke(1.dp, Color(0x14FFFFFF)), RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(if (enabled) Ok else Warn),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = TextPrimary, fontSize = 13.5.sp, fontWeight = FontWeight.Medium)
+            Text(desc, color = TextFaint, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        Text(
+            text = if (enabled) "已开启" else "去开启",
+            color = if (enabled) Ok else Accent,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier
+                .clip(RoundedCornerShape(999.dp))
+                .background(if (enabled) Color(0x1F5EE6A0) else Color(0x2E6EA8FF))
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+        )
+    }
+}
+
+@Composable
+private fun GlassPill(text: String, color: Color) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .clip(RoundedCornerShape(999.dp))
+            .background(color.copy(alpha = 0.16f))
+            .border(BorderStroke(1.dp, color.copy(alpha = 0.4f)), RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(color))
+        Spacer(Modifier.width(6.dp))
+        Text(text, color = color, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun GlassButton(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    modifier: Modifier = Modifier,
+    accent: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        shape = RoundedCornerShape(14.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (accent) Accent else Color(0x1FFFFFFF),
+            contentColor = TextPrimary,
+        ),
+        border = BorderStroke(1.dp, if (accent) Color(0x40FFFFFF) else GlassBorder),
+        elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+    ) {
+        Icon(icon, null, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(text, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+
+fun isNotificationAccessEnabled(context: Context): Boolean {
+    val flat = Settings.Secure.getString(
+        context.contentResolver,
+        "enabled_notification_listeners",
+    ) ?: return false
+    val cn = ComponentName(context, com.phonetopc.copycode.service.SmsNotificationListener::class.java)
+    return flat.split(':').any { ComponentName.unflattenFromString(it) == cn }
+}
+
+private fun openNotificationAccessSettings(context: Context) {
+    try {
+        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+    } catch (_: Exception) {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS))
+    }
+}
+

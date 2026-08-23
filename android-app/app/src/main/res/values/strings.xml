@@ -1,0 +1,4 @@
+﻿<resources>
+    <string name="app_name">验证码桥接</string>
+    <string name="notification_listener_label">验证码桥接 - 短信通知监听</string>
+</resources>

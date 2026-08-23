@@ -1,0 +1,26 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 渐变底（圆角方块） -->
+    <path
+        android:pathData="M30,14 h48 a16,16 0 0 1 16,16 v48 a16,16 0 0 1 -16,16 h-48 a16,16 0 0 1 -16,-16 v-48 a16,16 0 0 1 16,-16 z"
+        android:fillColor="#5A78FF" />
+    <!-- 手机 -->
+    <path
+        android:pathData="M36,40 h9 v30 h-9 z"
+        android:fillColor="#FFFFFF" />
+    <!-- 箭头 -->
+    <path
+        android:pathData="M50,55 h16 l-5,-5 m5,5 l-5,5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- 显示器 -->
+    <path
+        android:pathData="M70,44 h12 v10 h-12 z M74,54 h4 v8 h-4 z"
+        android:fillColor="#FFFFFF" />
+</vector>
