@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -46,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.phonetopc.copycode.data.CodeSender
-import com.phonetopc.copycode.data.Settings
+import com.phonetopc.copycode.data.Settings as AppSettings
 import com.phonetopc.copycode.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -59,7 +58,7 @@ import kotlinx.coroutines.withContext
 fun MainScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val settings = remember { Settings.get() }
+    val settings = remember { AppSettings.get() }
 
     // 表单状态
     var host by remember { mutableStateOf(settings.pcHost) }
@@ -215,7 +214,7 @@ fun MainScreen() {
                         modifier = Modifier.weight(1f),
                     ) {
                         settings.pcHost = host
-                        settings.pcPort = port.toIntOrNull() ?: Settings.DEFAULT_PORT
+                        settings.pcPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
                         settings.token = token
                         settings.autoSend = autoSend
                         settings.customRegex = customRegex
@@ -228,7 +227,7 @@ fun MainScreen() {
                         modifier = Modifier.weight(1f),
                     ) {
                         settings.pcHost = host
-                        settings.pcPort = port.toIntOrNull() ?: Settings.DEFAULT_PORT
+                        settings.pcPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
                         settings.token = token
                         if (!settings.isValid()) {
                             statusMsg = "请先填写 PC 地址"
@@ -479,7 +478,7 @@ private fun GlassButton(
 
 
 fun isNotificationAccessEnabled(context: Context): Boolean {
-    val flat = Settings.Secure.getString(
+    val flat = android.provider.Settings.Secure.getString(
         context.contentResolver,
         "enabled_notification_listeners",
     ) ?: return false
@@ -489,9 +488,10 @@ fun isNotificationAccessEnabled(context: Context): Boolean {
 
 private fun openNotificationAccessSettings(context: Context) {
     try {
-        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
     } catch (_: Exception) {
-        context.startActivity(Intent(Settings.ACTION_SETTINGS))
+        context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
     }
 }
+
 

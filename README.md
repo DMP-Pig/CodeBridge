@@ -27,6 +27,12 @@ npm start
 在 App 内开启「通知监听」权限（用于读取短信验证码通知），
 填写 PC 的局域网地址与 Token 后即可自动转发。
 
+## 当前状态（0.1.0beta1）
+
+- PC 端已在本机验证：局域网服务、验证码展示、剪贴板复制（手动/自动/灵动岛按钮）、WinIsland 上岛推送均通过实测。
+- 手机端为完整 Android Studio 工程源码，需在装有 Android SDK 的机器上构建 APK（本环境无法联网下载 Android 依赖）。
+- 测试方法：`cd pc-client && npm start`，然后 `curl -X POST http://127.0.0.1:9841/api/code -H "Content-Type: application/json" -d '{"code":"123456"}'`。
+
 ## 与 WinIsland 联动
 
 PC 端「上岛」按钮会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9840`），
@@ -36,3 +42,4 @@ PC 端「上岛」按钮会调用 WinIsland 的上岛 API（默认 `http://127.0
 
 当前版本：`0.1.0beta1`（Beta / 迭代版本，不上传远端，仅本地保留）。
 发布产物统一存放于 `releases/<版本号>/`，命名规则见《通用文件管理要求》。
+

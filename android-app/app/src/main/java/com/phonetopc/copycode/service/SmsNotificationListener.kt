@@ -37,7 +37,6 @@ class SmsNotificationListener : NotificationListenerService() {
         // 去重：相同 包名+验证码+正文 短时间内只发一次
         val dedupKey = "${sbn.packageName}|$code|${full.hashCode()}"
         if (!recent.add(dedupKey)) return
-        recent.add(dedupKey)
         if (recent.size > 500) recent.clear()
 
         val source = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: sbn.packageName
@@ -87,3 +86,4 @@ class SmsNotificationListener : NotificationListenerService() {
         )
     }
 }
+
