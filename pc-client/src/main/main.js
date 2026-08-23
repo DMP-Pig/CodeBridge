@@ -143,19 +143,51 @@ function decodeIconEscape(s) {
   if (typeof s !== 'string') return s;
   return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
+/**
+ * 构建上岛卡片载荷（单行、不拓宽灵动岛）。
+ */
+function buildIslandPayload(entry) {
+  const bodyParts = [];
+  if (entry.app) bodyParts.push(`来自 ${entry.app}`);
+  if (entry.source) bodyParts.push(entry.source);
+  return {
+    title: `验证码 ${entry.code}`,
+    body: bodyParts.join(' '),
+    icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
+    duration_seconds: Number(settings.island.durationSeconds) || 30,
+    id: `phonetopc-${entry.id}`,
+    buttons: [
+      { label: '复制', action: 'launch', value: `${process.execPath} --copy-last` },
+    ],
+  };
+}
+
+/** 按 WinIsland PushCompactWidth 公式估算内容所需宽度（px）。<=180 不触发灵动岛加宽。 */
+function measureTextWidth(s, cjkPx, asciiPx) {
+  let w = 0;
+  for (const ch of s) w += ch > 0x2E7F ? cjkPx : asciiPx;
+  return w;
+}
+function estimateIslandNeed(entry) {
+  const payload = buildIslandPayload(entry);
+  let need = measureTextWidth(payload.title, 15, 8);
+  if (payload.body) need = Math.max(need, Math.min(measureTextWidth(payload.body, 13.5, 7), 460));
+  if (payload.buttons && payload.buttons.length > 0) {
+    let btnW = 0;
+    for (const b of payload.buttons) btnW += measureTextWidth(b.label, 12, 6.5) + 26;
+    btnW += (payload.buttons.length - 1) * 8;
+    need = Math.max(need, btnW);
+  }
+  return need;
+}
 function pushToIsland(entry) {
   return new Promise((resolve, reject) => {
     const base = (settings.island.baseUrl || 'http://127.0.0.1:9840').replace(/\/+$/, '');
-    const payload = {
-      title: '短信验证码',
-      body: `验证码：${entry.code}${entry.app ? `\n来源：${entry.app}` : ''}${entry.source ? `\n号码：${entry.source}` : ''}`,
-      icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
-      duration_seconds: Number(settings.island.durationSeconds) || 30,
-      id: `phonetopc-${entry.id}`,
-      buttons: [
-        { label: '复制验证码', action: 'launch', value: `${process.execPath} --copy-last` },
-      ],
-    };
+    // 单行 + 不影响灵动岛宽度：
+    //   - 验证码放进短标题，紧凑单行直接可见；
+    //   - 正文拼成单行（无换行）且足够短（宽度估算 < 180px，不触发灵动岛加宽）；
+    //   - 按钮标签尽量短。
+    const payload = buildIslandPayload(entry);
     const body = JSON.stringify(payload);
     const req = http.request(base + '/v1/island/push', {
       method: 'POST',
@@ -479,6 +511,11 @@ async function runVerify() {
     if (codeHistory[0]) {
       try { await pushToIsland(codeHistory[0]); islandRes = { ok: true }; }
       catch (err) { islandRes = { ok: false, error: err.message }; }
+    }
+    if (codeHistory[0]) {
+      result.islandNeedPx = estimateIslandNeed(codeHistory[0]);
+      const pl = buildIslandPayload(codeHistory[0]);
+      result.islandSingleLine = !pl.title.includes('\n') && !pl.body.includes('\n');
     }
     result.islandPush = islandRes;
     console.log('VERIFY_RESULT ' + JSON.stringify(result));

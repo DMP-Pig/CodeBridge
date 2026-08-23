@@ -45,12 +45,12 @@ npm start
 在 App 内开启「通知监听」权限（用于读取短信验证码通知），
 填写 PC 的局域网地址与 Token 后即可自动转发。
 
-## 当前状态（0.1.0beta1）
+## 当前状态（1.0.0beta1）
 
-- **两端产物均已构建**，位于 `releases/0.1.0beta1/`：
-  - `PhoneToPCCopyCode-0.1.0beta1-android.apk`（手机端）
-  - `PhoneToPCCopyCode-0.1.0beta1-windows-installer.exe`（PC 安装包）
-  - `PhoneToPCCopyCode-0.1.0beta1-windows-x64-portable.exe`（PC 便携版）
+- **两端产物均已构建**，位于 `releases/1.0.0beta1/`：
+  - `PhoneToPCCopyCode-1.0.0beta1-android.apk`（手机端）
+  - `PhoneToPCCopyCode-1.0.0beta1-windows-installer.exe`（PC 安装包）
+  - `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe`（PC 便携版）
 - PC 端已实测：局域网服务、验证码展示、剪贴板复制（手动/自动/灵动岛按钮）、WinIsland 上岛推送均通过。
 - 手机端 APK 已用本机 SDK + Gradle 8.8 + 阿里云镜像实测编译成功（debug 版可直接安装）。
 - 测试方法：`cd pc-client && npm start`，然后 `curl -X POST http://127.0.0.1:9841/api/code -H "Content-Type: application/json" -d '{"code":"123456"}'`。
@@ -62,6 +62,6 @@ PC 端「上岛」按钮会调用 WinIsland 的上岛 API（默认 `http://127.0
 
 ## 版本
 
-当前版本：`0.1.0beta1`（Beta / 迭代版本，不上传远端，仅本地保留）。
+当前版本：`1.0.0beta1`（Beta / 迭代版本，不上传远端，仅本地保留）。
 发布产物统一存放于 `releases/<版本号>/`，命名规则见《通用文件管理要求》。
 
