@@ -215,6 +215,7 @@ function fillSettingsForm() {
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
   $('#setIslandToken').value = s.island?.token || '';
   $('#setIslandDuration').value = s.island?.durationSeconds ?? 30;
+  $('#setIslandIcon').value = s.island?.icon || '\\uE8D6';
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
 }
@@ -236,6 +237,7 @@ async function saveSettings() {
       baseUrl: $('#setIslandUrl').value.trim(),
       token: $('#setIslandToken').value.trim(),
       durationSeconds: clamp(parseInt($('#setIslandDuration').value, 10), 3, 600),
+      icon: $('#setIslandIcon').value.trim(),
     },
     ui: {
       accent: $('#setAccent').value,
