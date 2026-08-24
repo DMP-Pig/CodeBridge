@@ -210,6 +210,7 @@ function fillSettingsForm() {
   $('#setToken').value = s.server?.token || '';
   $('#setAutoDisplay').checked = !!s.behavior?.autoDisplay;
   $('#setAutoCopy').checked = !!s.behavior?.autoCopy;
+  $('#setCopyRestore').value = s.behavior?.autoCopyRestoreSeconds ?? 60;
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
@@ -230,6 +231,7 @@ async function saveSettings() {
     behavior: {
       autoDisplay: $('#setAutoDisplay').checked,
       autoCopy: $('#setAutoCopy').checked,
+      autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
       playSound: $('#setSound').checked,
     },

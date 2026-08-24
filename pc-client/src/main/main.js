@@ -23,7 +23,8 @@ const DEFAULT_SETTINGS = {
   },
   behavior: {
     autoDisplay: true,      // 收到验证码自动展示（悬浮提示 + 列表）
-    autoCopy: false,        // 收到验证码自动复制到剪贴板
+    autoCopy: false,
+    autoCopyRestoreSeconds: 60,  // 自动复制后 N 秒恢复原剪贴板（0=不恢复）        // 收到验证码自动复制到剪贴板
     autoIsland: false,      // 收到验证码自动推送到 WinIsland
     playSound: true,        // 收到验证码播放提示音
   },
@@ -44,6 +45,8 @@ let codeHistory = [];       // 最新在前
 let server = null;
 let mainWindow = null;
 let tray = null;
+let clipboardRestoreTimer = null;   // 剪贴板恢复计时器
+let clipboardRestoreValue = null; // 复制验证码前的剪贴板内容
 
 // ---------------------------------------------------------------- 设置
 function settingsFile() {
@@ -126,6 +129,31 @@ function addHistory(entry) {
 // ---------------------------------------------------------------- 剪贴板
 function copyText(text) {
   clipboard.writeText(text || '');
+}
+
+/**
+ * 自动复制并在 N 秒后恢复原剪贴板。
+ * 多条验证码连续到达时：保留第一次的原剪贴板，并重置计时器。
+ */
+function autoCopyWithRestore(code) {
+  const secs = Math.max(0, Number(settings.behavior.autoCopyRestoreSeconds) || 60);
+  // 首次复制前保存当前剪贴板（后续验证码不覆盖原值）
+  if (clipboardRestoreTimer == null) {
+    clipboardRestoreValue = clipboard.readText();
+  }
+  copyText(code);
+  if (clipboardRestoreTimer) clearTimeout(clipboardRestoreTimer);
+  if (secs > 0) {
+    clipboardRestoreTimer = setTimeout(() => {
+      clipboardRestoreTimer = null;
+      const prev = clipboardRestoreValue;
+      clipboardRestoreValue = null;
+      if (prev != null) {
+        copyText(prev);
+        emitToRenderer('action:notice', { kind: 'copy', text: '剪贴板已恢复为原内容' });
+      }
+    }, secs * 1000);
+  }
 }
 
 // ---------------------------------------------------------------- WinIsland 上岛
@@ -285,7 +313,7 @@ async function handleRequest(req, res) {
 function handleAutoActions(entry) {
   // 自动复制
   if (settings.behavior.autoCopy) {
-    copyText(entry.code);
+    autoCopyWithRestore(entry.code);
     emitToRenderer('action:notice', { kind: 'copy', text: '已自动复制到剪贴板' });
   }
   // 自动上岛
