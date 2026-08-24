@@ -2,11 +2,14 @@ package com.phonetopc.copycode.ui
 
 import android.content.ComponentName
 import android.content.Context
+import android.net.Uri
 import android.content.Intent
 import android.app.Activity
 import android.content.pm.PackageManager
+import android.provider.Settings
 import org.json.JSONObject
 import android.os.Build
+import android.os.PowerManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -29,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Search
@@ -43,6 +47,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,6 +58,8 @@ import com.phonetopc.copycode.data.FoundPc
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings as AppSettings
 import com.phonetopc.copycode.ui.theme.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -77,12 +84,29 @@ fun MainScreen() {
     var foundHosts by remember { mutableStateOf<List<FoundPc>?>(null) }
     var lastSearchPort by remember { mutableStateOf(AppSettings.DEFAULT_PORT) }
 
-    val listenerEnabled = remember {
-        isNotificationAccessEnabled(context)
+    var listenerEnabled by remember { mutableStateOf(isNotificationAccessEnabled(context)) }
+    var smsGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
+                PackageManager.PERMISSION_GRANTED
+        )
     }
-    val smsGranted = remember {
-        ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
-            PackageManager.PERMISSION_GRANTED
+    var batteryWhitelisted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+
+    // 从系统设置页返回时刷新权限 / 保活状态
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                listenerEnabled = isNotificationAccessEnabled(context)
+                smsGranted =
+                    ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
+                        PackageManager.PERMISSION_GRANTED
+                batteryWhitelisted = isIgnoringBatteryOptimizations(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -456,6 +480,33 @@ fun MainScreen() {
                 }
             }
 
+            // 后台保活卡片
+            GlassCard {
+                CardHeader(Icons.Default.PowerSettingsNew, "后台保活")
+                PermissionRow(
+                    title = "忽略电池优化",
+                    desc = if (batteryWhitelisted) "已加入白名单，后台不易被系统回收" else "允许后台驻留，避免收不到验证码",
+                    enabled = batteryWhitelisted,
+                ) {
+                    openBatteryOptimizationSettings(context)
+                }
+                Spacer(Modifier.height(8.dp))
+                PermissionRow(
+                    title = "自启动 / 后台运行",
+                    desc = "在系统设置中允许自启动、后台运行（不同品牌入口不同）",
+                    enabled = false,
+                ) {
+                    openAppDetailsSettings(context)
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "提示：在最近任务中下拉本应用卡片可锁定；开启「通知使用权」后应用会在后台驻留监听验证码。",
+                    color = TextDim,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+            }
+
             // 使用说明
             GlassCard {
                 CardHeader(Icons.Default.Sms, "使用步骤")
@@ -672,6 +723,48 @@ private fun openNotificationAccessSettings(context: Context) {
         context.startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
     } catch (_: Exception) {
         context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS))
+    }
+}
+
+/** 是否已加入电池优化白名单 */
+private fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+    val pm = context.getSystemService(Context.POWER_SERVICE) as? PowerManager ?: return false
+    return pm.isIgnoringBatteryOptimizations(context.packageName)
+}
+
+/** 引导加入电池优化白名单；不支持时退回电池设置页 */
+private fun openBatteryOptimizationSettings(context: Context) {
+    try {
+        if (Build.VERSION.SDK_INT >= 23) {
+            context.startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:${context.packageName}"),
+                )
+            )
+            return
+        }
+    } catch (_: Exception) {
+        // 部分系统不支持直接请求，退回通用设置页
+    }
+    try {
+        context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+    } catch (_: Exception) {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS))
+    }
+}
+
+/** 打开应用详情页：自启动 / 后台运行等品牌化入口一般在该页附近 */
+private fun openAppDetailsSettings(context: Context) {
+    try {
+        context.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${context.packageName}"),
+            )
+        )
+    } catch (_: Exception) {
+        context.startActivity(Intent(Settings.ACTION_SETTINGS))
     }
 }
 
