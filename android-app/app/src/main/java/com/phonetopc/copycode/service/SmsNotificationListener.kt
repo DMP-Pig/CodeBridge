@@ -1,6 +1,9 @@
 package com.phonetopc.copycode.service
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.phonetopc.copycode.data.CodeExtractor
@@ -17,9 +20,50 @@ class SmsNotificationListener : NotificationListenerService() {
 
     private val recent = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
 
+    override fun onCreate() {
+        super.onCreate()
+        // 服务可能单独启动（未经过 MainActivity），必须先初始化设置
+        Settings.init(applicationContext)
+    }
+
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        startAsForeground()
+    }
+
+    /** 前台服务：App 主界面关闭后仍在后台存活，防止进程被系统回收 */
+    private fun startAsForeground() {
+        try {
+            val channelId = "codebridge_listener"
+            if (Build.VERSION.SDK_INT >= 26) {
+                val chan = NotificationChannel(
+                    channelId, "验证码桥接监听",
+                    NotificationManager.IMPORTANCE_LOW,
+                ).apply { description = "在后台监听短信验证码并转发到 PC" }
+                getSystemService(NotificationManager::class.java).createNotificationChannel(chan)
+            }
+            val notif = Notification.Builder(this, channelId)
+                .setSmallIcon(android.R.drawable.stat_notify_sync)
+                .setContentTitle("CodeBridge 正在后台运行")
+                .setContentText("收到短信验证码将自动转发到 PC")
+                .setOngoing(true)
+                .setCategory(Notification.CATEGORY_SERVICE)
+                .build()
+            startForeground(1001, notif)
+        } catch (_: Exception) {
+            // 前台通知失败不影响通知监听本身
+        }
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         super.onNotificationPosted(sbn)
-        val settings = Settings.get()
+        // 跳过自己的前台服务通知，避免自触发处理
+        if (sbn.packageName == packageName) return
+        val settings = try {
+            Settings.get()
+        } catch (_: IllegalStateException) {
+            Settings.init(applicationContext)
+        }
         if (!settings.autoSend) return
         if (!settings.isValid()) return
 

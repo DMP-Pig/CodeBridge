@@ -45,12 +45,31 @@ const DEFAULT_SETTINGS = {
 app.setPath('userData', path.join(app.getPath('appData'), 'PhoneToPCCopyCode'));
 
 let settings = loadSettings();
+
+// 设备唯一 ID：用于手机端自动搜索时识别同一台 PC（避免 USB 与局域网双通道显示重复）
+let deviceId = '';
+function loadDeviceId() {
+  try {
+    const f = path.join(app.getPath('userData'), 'device.json');
+    if (fs.existsSync(f)) {
+      const parsed = JSON.parse(fs.readFileSync(f, 'utf8'));
+      if (parsed && parsed.id) { deviceId = parsed.id; return; }
+    }
+    deviceId = crypto.randomUUID();
+    fs.writeFileSync(f, JSON.stringify({ id: deviceId }), 'utf8');
+  } catch {
+    try { deviceId = crypto.randomUUID(); } catch { deviceId = 'pc-' + Date.now(); }
+  }
+}
+loadDeviceId();
+
 let codeHistory = [];       // 最新在前
 let server = null;
 let mainWindow = null;
 let tray = null;
 let clipboardRestoreTimer = null;   // 剪贴板恢复计时器
 let clipboardRestoreValue = null; // 复制验证码前的剪贴板内容
+let isQuitting = false;           // 用户从托盘主动退出时为 true，允许真正关闭窗口
 
 // ---------------------------------------------------------------- 设置
 function settingsFile() {
@@ -290,7 +309,7 @@ async function handleRequest(req, res) {
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
   if (req.method === 'GET' && pathname === '/health') {
-    return sendJson(res, 200, { ok: true, name: APP_NAME, version: APP_VERSION, time: new Date().toISOString() });
+    return sendJson(res, 200, { ok: true, name: APP_NAME, version: APP_VERSION, id: deviceId, hostname: os.hostname(), time: new Date().toISOString() });
   }
 
   if (req.method === 'POST' && pathname === '/api/code') {
@@ -398,6 +417,13 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  // 关闭主界面窗口 = 隐藏到系统托盘，局域网服务继续后台运行（满足“后台存活”）
+  mainWindow.on('close', (e) => {
+    if (!isQuitting) {
+      e.preventDefault();
+      mainWindow.hide();
+    }
+  });
   mainWindow.on('closed', () => { mainWindow = null; });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
@@ -412,12 +438,21 @@ function createTray() {
     if (icon.isEmpty()) return;
     tray = new Tray(icon);
     tray.setToolTip(APP_NAME);
+    const showMain = () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      } else {
+        createWindow();
+      }
+    };
     tray.setContextMenu(Menu.buildFromTemplate([
-      { label: '打开主界面', click: () => { if (mainWindow) mainWindow.show(); } },
+      { label: '打开主界面', click: showMain },
       { type: 'separator' },
-      { label: '退出', click: () => app.quit() },
+      { label: '退出', click: () => { isQuitting = true; app.quit(); } },
     ]));
-    tray.on('click', () => { if (mainWindow) mainWindow.show(); });
+    tray.on('click', showMain);
   } catch (err) {
     console.error('创建托盘失败:', err);
   }
@@ -493,6 +528,24 @@ function registerIpc() {
 }
 
 // ---------------------------------------------------------------- 生命周期
+// 单实例：再次运行 exe 时恢复主窗口（--copy-last 副本模式除外）
+if (!process.argv.includes('--copy-last')) {
+  const gotLock = app.requestSingleInstanceLock();
+  if (!gotLock) {
+    app.quit();
+  } else {
+    app.on('second-instance', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
+      } else {
+        createWindow();
+      }
+    });
+  }
+}
+
 // 被 WinIsland 灵动岛按钮启动：把最后一条验证码复制到剪贴板后退出
 if (process.argv.includes('--copy-last')) {
   app.whenReady().then(() => {
@@ -515,9 +568,9 @@ app.whenReady().then(() => {
 
 } // end else (--copy-last)
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+// 关闭主界面后继续后台运行：所有平台都不因窗口关闭而退出（由托盘“退出”真正结束）
+app.on('window-all-closed', () => { });
+app.on('before-quit', () => { isQuitting = true; });
 
 
 // ---------------------------------------------------------------- 验证模式（--verify / --screenshot）

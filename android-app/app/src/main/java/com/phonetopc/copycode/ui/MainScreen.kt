@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.*
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.phonetopc.copycode.data.AutoDiscover
+import com.phonetopc.copycode.data.FoundPc
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings as AppSettings
 import com.phonetopc.copycode.ui.theme.*
@@ -68,6 +71,8 @@ fun MainScreen() {
     var customRegex by remember { mutableStateOf(settings.customRegex) }
     var statusMsg by remember { mutableStateOf("就绪") }
     var statusOk by remember { mutableStateOf(true) }
+    var foundHosts by remember { mutableStateOf<List<FoundPc>?>(null) }
+    var lastSearchPort by remember { mutableStateOf(AppSettings.DEFAULT_PORT) }
 
     val listenerEnabled = remember {
         isNotificationAccessEnabled(context)
@@ -144,6 +149,14 @@ fun MainScreen() {
                 )
         )
 
+        fun applyFoundHost(ip: String, p: Int) {
+            val (h, pp) = parseHostPort("$ip:$p", p)
+            host = h
+            port = pp.toString()
+            settings.pcHost = h
+            settings.pcPort = pp
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -166,7 +179,42 @@ fun MainScreen() {
             // 服务配置卡片
             GlassCard {
                 CardHeader(Icons.Default.Settings, "PC 接收端")
-                GlassTextField(host, { host = it }, "PC 地址（IP 或主机名）", "192.168.1.100")
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassTextField(
+                        value = host,
+                        onValueChange = { host = it },
+                        label = "PC 地址（IP 或主机名）",
+                        placeholder = "192.168.1.100:9841",
+                        modifier = Modifier.weight(1f),
+                    )
+                    GlassButton(
+                        text = "搜索",
+                        icon = Icons.Default.Search,
+                        modifier = Modifier.width(84.dp),
+                    ) {
+                        statusMsg = "正在搜索 PC…"
+                        statusOk = true
+                        scope.launch {
+                            val searchPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
+                            val foundList = withContext(Dispatchers.IO) {
+                                AutoDiscover.discoverAll(searchPort)
+                            }
+                            if (foundList.isEmpty()) {
+                                statusMsg = "未找到 PC，请确认手机与电脑在同一网络或已连接 USB"
+                                statusOk = false
+                            } else if (foundList.size == 1) {
+                                applyFoundHost(foundList[0].ip, searchPort)
+                                statusMsg = "已找到 PC：${foundList[0].ip}"
+                                statusOk = true
+                            } else {
+                                lastSearchPort = searchPort
+                                foundHosts = foundList
+                                statusMsg = "找到 ${foundList.size} 台 PC，请选择"
+                                statusOk = true
+                            }
+                        }
+                    }
+                }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassTextField(
@@ -205,6 +253,68 @@ fun MainScreen() {
                         placeholder = "\\d{6}",
                     )
                 }
+
+                // 搜索结果：多台 PC 时弹出选择
+                foundHosts?.let { hosts ->
+                    AlertDialog(
+                        onDismissRequest = { foundHosts = null },
+                        title = { Text("选择要推送的 PC", color = TextPrimary) },
+                        text = {
+                            Column {
+                                hosts.forEach { pc ->
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .clickable {
+                                                applyFoundHost(pc.ip, lastSearchPort)
+                                                foundHosts = null
+                                                statusMsg = "已选择 PC：${pc.ip}"
+                                                statusOk = true
+                                            }
+                                            .padding(horizontal = 10.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Box(
+                                            Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(Ok)
+                                        )
+                                        Spacer(Modifier.width(10.dp))
+                                        Column {
+                                            Text(
+                                                "${pc.ip}:$lastSearchPort",
+                                                color = TextPrimary,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                            )
+                                            if (pc.hostname.isNotBlank()) {
+                                                Text(
+                                                    pc.hostname,
+                                                    color = TextFaint,
+                                                    fontSize = 11.sp,
+                                                )
+                                            }
+                                        }
+                                        Spacer(Modifier.weight(1f))
+                                        Text(
+                                            if (pc.isUsb) "USB" else "局域网",
+                                            color = if (pc.isUsb) Warn else Ok,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { foundHosts = null }) { Text("取消", color = Accent) }
+                        },
+                        containerColor = Color(0xFF16203A),
+                        shape = RoundedCornerShape(18.dp),
+                    )
+                }
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassButton(
@@ -213,8 +323,11 @@ fun MainScreen() {
                         accent = true,
                         modifier = Modifier.weight(1f),
                     ) {
-                        settings.pcHost = host
-                        settings.pcPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
+                        val (saveHost, savePort) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
+                        host = saveHost
+                        port = savePort.toString()
+                        settings.pcHost = saveHost
+                        settings.pcPort = savePort
                         settings.token = token
                         settings.autoSend = autoSend
                         settings.customRegex = customRegex
@@ -226,8 +339,11 @@ fun MainScreen() {
                         icon = Icons.Default.Send,
                         modifier = Modifier.weight(1f),
                     ) {
-                        settings.pcHost = host
-                        settings.pcPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
+                        val (sendHost, sendPort) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
+                        host = sendHost
+                        port = sendPort.toString()
+                        settings.pcHost = sendHost
+                        settings.pcPort = sendPort
                         settings.token = token
                         if (!settings.isValid()) {
                             statusMsg = "请先填写 PC 地址"
@@ -495,3 +611,24 @@ private fun openNotificationAccessSettings(context: Context) {
 }
 
 
+
+/**
+ * 智能解析 PC 地址：支持 "IP" / "IP:端口" / "http://IP:端口"。
+ * 例如 "192.168.31.77:9841" -> host=192.168.31.77, port=9841
+ */
+private fun parseHostPort(input: String, defaultPort: Int): Pair<String, Int> {
+    var t = input.trim()
+    if (t.startsWith("http://")) t = t.removePrefix("http://")
+    if (t.startsWith("https://")) t = t.removePrefix("https://")
+    val slash = t.indexOf('/')
+    if (slash >= 0) t = t.substring(0, slash)
+    val idx = t.lastIndexOf(':')
+    if (idx > 0) {
+        val maybePort = t.substring(idx + 1).trim()
+        val p = maybePort.toIntOrNull()
+        if (p != null && p in 1..65535) {
+            return t.substring(0, idx).ifBlank { "127.0.0.1" } to p
+        }
+    }
+    return t.ifBlank { "" } to defaultPort
+}
