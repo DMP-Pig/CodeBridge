@@ -890,6 +890,69 @@ function applyAutoLaunch() {
 }
 
 // ---------------------------------------------------------------- IPC
+// ---------------------------------------------------------------- 导出 / 导入
+function csvEscape(v) {
+  const s = String(v == null ? '' : v);
+  return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function historyToCsv(list) {
+  const head = ['id', 'code', 'app', 'source', 'from', 'time'];
+  const rows = (list || []).map((e) => [e.id, e.code, e.app, e.source, e.from, e.time].map(csvEscape).join(','));
+  return '\uFEFF' + head.join(',') + '\n' + rows.join('\n');
+}
+function parseCsvHistory(text) {
+  const rows = [];
+  let row = [];
+  let cur = '';
+  let inQ = false;
+  const src = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (inQ) {
+      if (ch === '"') {
+        if (src[i + 1] === '"') { cur += '"'; i++; }
+        else inQ = false;
+      } else cur += ch;
+    } else if (ch === '"') {
+      inQ = true;
+    } else if (ch === ',') {
+      row.push(cur); cur = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && src[i + 1] === '\n') i++;
+      row.push(cur); cur = '';
+      if (row.some((c) => c.trim() !== '')) rows.push(row);
+      row = [];
+    } else cur += ch;
+  }
+  if (cur !== '' || row.length) {
+    row.push(cur);
+    if (row.some((c) => c.trim() !== '')) rows.push(row);
+  }
+  return rows;
+}
+function normalizeImported(raw) {
+  const out = [];
+  const seen = new Set((codeHistory || []).map((e) => e && e.id));
+  for (const it of (raw || [])) {
+    if (!it || typeof it !== 'object') continue;
+    const id = String(it.id || '').trim() || crypto.randomUUID();
+    const code = String(it.code || '').trim();
+    if (!code) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const timeRaw = new Date(it.time || '');
+    out.push({
+      id,
+      code,
+      app: String(it.app || mainT('\u77ed\u4fe1', 'SMS')).slice(0, 40),
+      source: String(it.source || '').slice(0, 40),
+      from: String(it.from || '').slice(0, 64),
+      time: !Number.isNaN(timeRaw.getTime()) ? timeRaw.toISOString() : new Date().toISOString(),
+    });
+  }
+  return out;
+}
+
 function registerIpc() {
   ipcMain.handle('app:info', () => ({
     name: APP_NAME,
@@ -951,6 +1014,70 @@ function registerIpc() {
     codeHistory = codeHistory.filter((c) => c.id !== id);
     saveHistory();
     return true;
+  });
+
+
+  ipcMain.handle('history:export-dialog', async (_e, format) => {
+    const fmt = format === 'json' ? 'json' : 'csv';
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    let defDir;
+    try { defDir = app.getPath('downloads'); } catch { defDir = app.getPath('home'); }
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: mainT('\u5bfc\u51fa\u9a8c\u8bc1\u7801\u5386\u53f2', 'Export code history'),
+      defaultPath: path.join(defDir, 'CodeBridge-history-' + stamp + '.' + fmt),
+      filters: fmt === 'json'
+        ? [{ name: 'JSON', extensions: ['json'] }]
+        : [{ name: 'CSV', extensions: ['csv'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    const content = fmt === 'json' ? JSON.stringify(codeHistory, null, 2) : historyToCsv(codeHistory);
+    fs.writeFileSync(filePath, content, 'utf8');
+    return { ok: true, path: filePath, count: codeHistory.length };
+  });
+
+  ipcMain.handle('history:import-dialog', async () => {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: mainT('\u5bfc\u5165\u9a8c\u8bc1\u7801\u5386\u53f2', 'Import code history'),
+      properties: ['openFile'],
+      filters: [{ name: 'CSV / JSON', extensions: ['csv', 'json'] }],
+    });
+    if (canceled || !filePaths || !filePaths[0]) return { ok: false, canceled: true };
+    const fp = filePaths[0];
+    let entries = [];
+    try {
+      const raw = fs.readFileSync(fp, 'utf8');
+      const lower = fp.toLowerCase();
+      if (lower.endsWith('.json')) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) entries = arr;
+        else if (arr && Array.isArray(arr.records)) entries = arr.records;
+        else return { ok: false, error: 'invalid' };
+      } else {
+        const rows = parseCsvHistory(raw);
+        if (rows.length < 2) return { ok: false, error: 'empty' };
+        const head = rows[0].map((h) => String(h || '').trim().toLowerCase());
+        const gi = (name) => head.indexOf(name);
+        entries = rows.slice(1).map((r) => ({
+          id: gi('id') >= 0 ? r[gi('id')] : '',
+          code: gi('code') >= 0 ? r[gi('code')] : '',
+          app: gi('app') >= 0 ? r[gi('app')] : '',
+          source: gi('source') >= 0 ? r[gi('source')] : '',
+          from: gi('from') >= 0 ? r[gi('from')] : '',
+          time: gi('time') >= 0 ? r[gi('time')] : '',
+        })).filter((it) => String(it.code || '').trim());
+      }
+    } catch (err) {
+      return { ok: false, error: String((err && err.message) || err) };
+    }
+    const added = normalizeImported(entries);
+    if (added.length) {
+      codeHistory = added.concat(codeHistory);
+      autoCleanHistory();
+      const max = Math.max(10, settings.ui.keepHistory || 50);
+      if (codeHistory.length > max) codeHistory.length = max;
+      saveHistory();
+    }
+    return { ok: true, added: added.length, skipped: entries.length - added.length };
   });
 
   ipcMain.handle('island:push', async (_e, id) => {

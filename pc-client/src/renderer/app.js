@@ -26,6 +26,9 @@ const els = {
   devicesRow: $('#devicesRow'),
   devicesHint: $('#devicesHint'),
   btnClearHistory: $('#btnClearHistory'),
+  btnExportCsv: $('#btnExportCsv'),
+  btnExportJson: $('#btnExportJson'),
+  btnImportHistory: $('#btnImportHistory'),
   drawer: $('#drawer'),
   drawerScrim: $('#drawerScrim'),
   drawerClose: $('#drawerClose'),
@@ -133,6 +136,9 @@ const I18N = {
     'hero.wait': '等待验证码', 'hero.waitSub': '手机发送验证码后，将在此处实时展示',
     'hero.copy': '复制', 'hero.island': '上岛', 'hero.clear': '清空',
     'history.msg.defaultApp': '短信', 'history.title': '历史记录', 'history.clearAll': '清空全部',
+    'history.exportCsv': '导出 CSV', 'history.exportJson': '导出 JSON', 'history.import': '导入',
+    'toast.exportOk': '已导出历史记录', 'toast.exportErr': '导出失败或已取消',
+    'toast.importOk': '导入完成：新增 {a} 条 / 跳过 {s} 条', 'toast.importErr': '导入失败',
     'stats.title': '验证码统计', 'stats.today': '今日', 'stats.total': '累计', 'stats.dist': '今日来源分布', 'stats.empty': '今日暂无数据',
     'history.empty': '暂无历史记录',
     'history.searchPh': '搜索验证码 / 应用 / 来源…', 'history.searchEmpty': '无匹配结果',
@@ -213,6 +219,9 @@ const I18N = {
     'hero.wait': 'Waiting for code', 'hero.waitSub': 'Codes sent from your phone will appear here',
     'hero.copy': 'Copy', 'hero.island': 'Island', 'hero.clear': 'Clear',
     'history.msg.defaultApp': 'SMS', 'history.title': 'History', 'history.clearAll': 'Clear All',
+    'history.exportCsv': 'Export CSV', 'history.exportJson': 'Export JSON', 'history.import': 'Import',
+    'toast.exportOk': 'History exported', 'toast.exportErr': 'Export failed or canceled',
+    'toast.importOk': 'Import done: {a} added / {s} skipped', 'toast.importErr': 'Import failed',
     'stats.title': 'Statistics', 'stats.today': 'Today', 'stats.total': 'Total', 'stats.dist': "Today's sources", 'stats.empty': 'No data today',
     'history.empty': 'No history yet',
     'history.searchPh': 'Search code / app / source…', 'history.searchEmpty': 'No matches',
@@ -758,6 +767,28 @@ els.btnClearHistory.addEventListener('click', async () => {
   showEmpty();
   renderHistory();
   toast('ok', t('toast.historyCleared'));
+});
+
+els.btnExportCsv.addEventListener('click', async () => {
+  const res = await api.exportHistory('csv').catch(() => null);
+  if (res && res.ok) toast('ok', t('toast.exportOk'));
+  else toast('err', t('toast.exportErr'));
+});
+els.btnExportJson.addEventListener('click', async () => {
+  const res = await api.exportHistory('json').catch(() => null);
+  if (res && res.ok) toast('ok', t('toast.exportOk'));
+  else toast('err', t('toast.exportErr'));
+});
+els.btnImportHistory.addEventListener('click', async () => {
+  const res = await api.importHistory().catch(() => null);
+  if (res && res.ok) {
+    codes = await api.listCodes();
+    if (codes.length > 0) showHero(codes[0]); else showEmpty();
+    renderHistory();
+    toast('ok', t('toast.importOk').replace('{a}', res.added).replace('{s}', res.skipped));
+  } else {
+    toast('err', t('toast.importErr'));
+  }
 });
 els.btnCopyHero.addEventListener('click', () => handleAction('copy', activeHeroId));
 els.btnIslandHero.addEventListener('click', () => handleAction('island', activeHeroId));
