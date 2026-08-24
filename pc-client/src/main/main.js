@@ -465,6 +465,35 @@ async function handleRequest(req, res) {
     return sendJson(res, 200, { ok: true, name: APP_NAME, version: APP_VERSION, id: deviceId, hostname: os.hostname(), time: new Date().toISOString() });
   }
 
+  // 端口 Web 控制台（/ 或 /web）
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/web')) {
+    return serveWebConsole(res);
+  }
+
+  // Web 控制台数据接口
+  if (req.method === 'GET' && pathname === '/api/console') {
+    if (!checkToken(req, {})) {
+      return sendJson(res, 401, { ok: false, error: 'token 无效' });
+    }
+    return sendJson(res, 200, {
+      ok: true,
+      app: {
+        name: APP_NAME,
+        version: APP_VERSION,
+        hostname: os.hostname(),
+        deviceId,
+        port: settings.server.port,
+        secure: !!tlsCredentials,
+        ips: getLanIps(),
+        uptime: Math.round(process.uptime()),
+        time: new Date().toISOString(),
+      },
+      devices: devicesToArray(),
+      history: codeHistory.slice(0, 30),
+      clipboardHistory: clipboardHistory.slice(0, 20),
+    });
+  }
+
   if (req.method === 'POST' && pathname === '/api/code') {
     let body;
     try { body = await readJsonBody(req); } catch (err) {
@@ -697,6 +726,18 @@ function triggerWebhookScript(entry) {
       .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: mainT('Webhook 调用失败: ' + err.message, 'Webhook failed: ' + err.message) }));
   }
   runScript(entry);
+}
+
+// 服务固定的 Web 控制台页面
+const WEB_CONSOLE_PATH = path.join(__dirname, '..', 'renderer', 'web-console.html');
+function serveWebConsole(res) {
+  try {
+    const html = fs.readFileSync(WEB_CONSOLE_PATH, 'utf8');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(html);
+  } catch (err) {
+    sendJson(res, 500, { ok: false, error: 'web console 页面加载失败: ' + err.message });
+  }
 }
 
 function startServer() {
