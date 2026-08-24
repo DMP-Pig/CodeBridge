@@ -39,6 +39,8 @@ const DEFAULT_SETTINGS = {
     token: '',              // WinIsland 设置的 X-WinIsland-Token
     durationSeconds: 30,
     icon: '\\uE8D6',        // 钥匙图标（Segoe MDL2）
+    titleStyle: 'code',     // 紧凑标题样式：'code' | 'cn' | 'en'
+    showAppInBody: true,    // 展开正文是否包含来源应用
   },
   ui: {
     accent: '#6ea8ff',
@@ -238,12 +240,22 @@ function decodeIconEscape(s) {
  * 构建上岛卡片载荷（单行、不拓宽灵动岛）。
  */
 function buildIslandPayload(entry) {
-  const bodyParts = ['验证码'];
-  if (entry.app) bodyParts.push(`来自 ${entry.app}`);
-  if (entry.source) bodyParts.push(entry.source);
+  // 紧凑标题样式（保持单行、不拓宽灵动岛）
+  const style = settings.island.titleStyle || 'code';
+  const codeStr = `${entry.code}`;
+  let title = codeStr;
+  if (style === 'cn') title = `验证码 ${codeStr}`;
+  else if (style === 'en') title = `Code ${codeStr}`;
+  // 展开态正文：来源应用等信息（可关闭）
+  const bodyParts = [];
+  if (settings.island.showAppInBody !== false) {
+    if (entry.app) bodyParts.push(`来自 ${entry.app}`);
+    if (entry.source) bodyParts.push(entry.source);
+  }
+  const body = bodyParts.length ? bodyParts.join(' · ') : '验证码';
   return {
-    title: `${entry.code}`,           // 紧凑标题只放验证码，保证固定宽度内完整显示
-    body: bodyParts.join(' · '),      // 展开态正文：验证码 · 来自 X · Y（单行）
+    title,                             // 紧凑标题（单行）
+    body,                              // 展开态正文（单行）
     icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
     duration_seconds: Number(settings.island.durationSeconds) || 30,
     id: `phonetopc-${entry.id}`,

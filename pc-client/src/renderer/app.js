@@ -30,6 +30,15 @@ const els = {
   btnSettings: $('#btnSettings'),
   btnSaveSettings: $('#btnSaveSettings'),
   btnTestIsland: $('#btnTestIsland'),
+  setIslandTitleStyle: $('#setIslandTitleStyle'),
+  setIslandShowApp: $('#setIslandShowApp'),
+  islandIconPresets: $('#islandIconPresets'),
+  islandPreview: $('#islandPreview'),
+  ipIcon: $('#ipIcon'),
+  ipTitle: $('#ipTitle'),
+  ipBody: $('#ipBody'),
+  btnPlayPreview: $('#btnPlayPreview'),
+
   toasts: $('#toasts'),
   btnMin: $('#btnMin'),
   btnMax: $('#btnMax'),
@@ -130,6 +139,13 @@ const I18N = {
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'WinIsland 中设置的 Token（留空则不传）',
     'set.islandIcon': '上岛图标', 'set.islandIconDesc': '支持 emoji（🔑）、文本或 \\uXXXX 转义（如 \\uE8D6）', 'set.islandIconPh': '\\uE8D6 或 🔑',
     'set.islandDuration': '显示时长（秒）', 'set.islandDurationDesc': '灵动岛卡片展示时长',
+    'set.islandTitleStyle': '紧凑标题样式', 'set.islandTitleStyleDesc': '紧凑态标题格式（保持单行、不影响岛宽）',
+    'set.islandTitleStyleCode': '仅验证码', 'set.islandTitleStyleCn': '验证码 123456', 'set.islandTitleStyleEn': 'Code 123456',
+    'set.islandShowApp': '正文显示来源', 'set.islandShowAppDesc': '展开态正文显示来源应用等信息',
+    'set.islandIconPreset': '图标快捷选择', 'set.islandIconPresetDesc': '点击填入上方图标输入框',
+    'set.islandPreview': '上岛动画预览', 'set.islandPreviewDesc': '模拟灵动岛展示效果；实际动画以 WinIsland 设置为准',
+    'set.islandPreviewBody': '验证码 · 来自 短信',
+    'btn.playPreview': '播放动画',
     'set.checkUpdate': '检查更新', 'set.checkUpdateDesc': '检查 GitHub 上是否有新版本',
     'set.theme': '主题', 'set.themeDesc': '深色/浅色显示模式', 'theme.dark': '深色', 'theme.light': '浅色',
     'set.language': '语言', 'set.languageDesc': '界面语言', 'lang.zh': '中文', 'lang.en': 'English',
@@ -182,6 +198,13 @@ const I18N = {
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'Token set in WinIsland (empty = not sent)',
     'set.islandIcon': 'Island Icon', 'set.islandIconDesc': 'emoji (🔑), text, or \\uXXXX escapes (e.g. \\uE8D6)', 'set.islandIconPh': '\\uE8D6 or 🔑',
     'set.islandDuration': 'Duration (s)', 'set.islandDurationDesc': 'How long the island card shows',
+    'set.islandTitleStyle': 'Compact title style', 'set.islandTitleStyleDesc': 'Compact title format (single-line, island width unaffected)',
+    'set.islandTitleStyleCode': 'Code only', 'set.islandTitleStyleCn': 'Code 123456', 'set.islandTitleStyleEn': 'Code 123456',
+    'set.islandShowApp': 'Show source in body', 'set.islandShowAppDesc': 'Show source app in expanded body',
+    'set.islandIconPreset': 'Icon presets', 'set.islandIconPresetDesc': 'Click to fill the icon input',
+    'set.islandPreview': 'Island animation preview', 'set.islandPreviewDesc': 'Simulates the island; actual animation follows WinIsland settings',
+    'set.islandPreviewBody': 'Code · from SMS',
+    'btn.playPreview': 'Play animation',
     'set.checkUpdate': 'Check Update', 'set.checkUpdateDesc': 'Check GitHub for a newer version',
     'set.theme': 'Theme', 'set.themeDesc': 'Dark or light appearance', 'theme.dark': 'Dark', 'theme.light': 'Light',
     'set.language': 'Language', 'set.languageDesc': 'Interface language', 'lang.zh': 'Chinese', 'lang.en': 'English',
@@ -219,6 +242,7 @@ function applyI18n() {
   document.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.dataset.i18nAria)); });
   document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
   document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+  if (typeof updateIslandPreview === 'function') updateIslandPreview();
 }
 
 
@@ -429,11 +453,15 @@ function fillSettingsForm() {
   $('#setIslandToken').value = s.island?.token || '';
   $('#setIslandDuration').value = s.island?.durationSeconds ?? 30;
   $('#setIslandIcon').value = s.island?.icon || '\\uE8D6';
+  $('#setIslandTitleStyle').value = s.island?.titleStyle || 'code';
+  $('#setIslandShowApp').checked = s.island?.showAppInBody !== false;
+
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
   $('#setAutoClean').value = s.ui?.autoCleanDays ?? 7;
   $('#setTheme').value = s.ui?.theme || 'dark';
   $('#setLanguage').value = s.ui?.language || 'zh';
+  updateIslandPreview();
 }
 
 function syncRestoreSecsEnabled() {
@@ -478,6 +506,8 @@ async function saveSettings() {
       token: $('#setIslandToken').value.trim(),
       durationSeconds: clamp(parseInt($('#setIslandDuration').value, 10), 3, 600),
       icon: $('#setIslandIcon').value.trim(),
+      titleStyle: $('#setIslandTitleStyle').value || 'code',
+      showAppInBody: $('#setIslandShowApp').checked,
     },
     ui: {
       accent: $('#setAccent').value,
@@ -498,6 +528,30 @@ async function saveSettings() {
   renderStatus(status);
   toast('ok', t('toast.saved'));
   closeDrawer();
+}
+
+/* ---------------- 上岛样式 / 动画预览 ---------------- */
+function decodeEscape(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+function updateIslandPreview() {
+  if (!els.ipIcon || !els.ipTitle || !els.ipBody) return;
+  const iconRaw = ($('#setIslandIcon').value || '').trim();
+  const icon = decodeEscape(iconRaw) || '\u{1F511}';
+  const style = $('#setIslandTitleStyle').value || 'code';
+  const code = '123456';
+  let title = code;
+  if (style === 'cn') title = `验证码 ${code}`;
+  else if (style === 'en') title = `Code ${code}`;
+  els.ipIcon.textContent = icon;
+  els.ipTitle.textContent = title;
+  els.ipBody.textContent = $('#setIslandShowApp').checked ? t('set.islandPreviewBody') : '验证码';
+}
+function playIslandPreview() {
+  els.islandPreview.classList.remove('anim');
+  void els.islandPreview.offsetWidth; // 强制 reflow 重启动画
+  els.islandPreview.classList.add('anim');
 }
 
 function clamp(n, min, max) {
@@ -531,6 +585,16 @@ els.btnTestIsland.addEventListener('click', async () => {
   else toast('err', (res && res.error) || t('toast.islandConnFail'));
 });
 els.btnRefreshQr.addEventListener('click', loadPairQr);
+$('#setIslandIcon').addEventListener('input', updateIslandPreview);
+$('#setIslandTitleStyle').addEventListener('change', updateIslandPreview);
+$('#setIslandShowApp').addEventListener('change', updateIslandPreview);
+els.islandIconPresets.addEventListener('click', (e) => {
+  const btn = e.target.closest('.icon-preset');
+  if (!btn) return;
+  $('#setIslandIcon').value = btn.dataset.icon || '';
+  updateIslandPreview();
+});
+els.btnPlayPreview.addEventListener('click', playIslandPreview);
 els.historySearch.addEventListener('input', (e) => {
   searchQuery = e.target.value;
   renderHistory();

@@ -265,6 +265,54 @@
           <input class="field num" id="setIslandDuration" type="number" min="3" max="600" />
         </div>
         <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.islandTitleStyle">紧凑标题样式</div>
+            <div class="set-desc" data-i18n="set.islandTitleStyleDesc">紧凑态标题格式（保持单行、不影响岛宽）</div>
+          </div>
+          <select class="field select" id="setIslandTitleStyle">
+            <option value="code" data-i18n="set.islandTitleStyleCode">仅验证码</option>
+            <option value="cn" data-i18n="set.islandTitleStyleCn">验证码 123456</option>
+            <option value="en" data-i18n="set.islandTitleStyleEn">Code 123456</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.islandShowApp">正文显示来源</div>
+            <div class="set-desc" data-i18n="set.islandShowAppDesc">展开态正文显示来源应用等信息</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setIslandShowApp" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.islandIconPreset">图标快捷选择</div>
+            <div class="set-desc" data-i18n="set.islandIconPresetDesc">点击填入上方图标输入框</div>
+          </div>
+          <div class="icon-presets" id="islandIconPresets">
+            <button type="button" class="icon-preset" data-icon="\uE8D6">MDL2</button>
+            <button type="button" class="icon-preset" data-icon="\uD83D\uDD11">🔑</button>
+            <button type="button" class="icon-preset" data-icon="✉">✉</button>
+            <button type="button" class="icon-preset" data-icon="📩">📩</button>
+            <button type="button" class="icon-preset" data-icon="⚡">⚡</button>
+            <button type="button" class="icon-preset" data-icon="💬">💬</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.islandPreview">上岛动画预览</div>
+            <div class="set-desc" data-i18n="set.islandPreviewDesc">模拟灵动岛展示效果；实际动画以 WinIsland 设置为准</div>
+          </div>
+        </div>
+        <div class="island-preview-box">
+          <div class="island-preview" id="islandPreview">
+            <div class="ip-inner">
+              <span class="ip-icon" id="ipIcon">🔑</span>
+              <span class="ip-title" id="ipTitle">123456</span>
+            </div>
+            <div class="ip-body" id="ipBody">验证码 · 来自 短信</div>
+          </div>
+          <button class="pill-btn" id="btnPlayPreview" data-i18n="btn.playPreview">播放动画</button>
+        </div>
+        <div class="set-row">
           <button class="glass-btn accent block" id="btnTestIsland" data-i18n="btn.testIsland">测试上岛连接</button>
         </div>
       </section>
