@@ -19,6 +19,9 @@ const els = {
   btnIslandHero: $('#btnIslandHero'),
   btnClearHero: $('#btnClearHero'),
   historyList: $('#historyList'),
+  statToday: $('#statToday'),
+  statTotal: $('#statTotal'),
+  statsApps: $('#statsApps'),
   historySearch: $('#historySearch'),
   btnClearHistory: $('#btnClearHistory'),
   drawer: $('#drawer'),
@@ -102,6 +105,7 @@ const I18N = {
     'hero.wait': '等待验证码', 'hero.waitSub': '手机发送验证码后，将在此处实时展示',
     'hero.copy': '复制', 'hero.island': '上岛', 'hero.clear': '清空',
     'history.msg.defaultApp': '短信', 'history.title': '历史记录', 'history.clearAll': '清空全部',
+    'stats.title': '验证码统计', 'stats.today': '今日', 'stats.total': '累计', 'stats.dist': '今日来源分布', 'stats.empty': '今日暂无数据',
     'history.empty': '暂无历史记录',
     'history.searchPh': '搜索验证码 / 应用 / 来源…', 'history.searchEmpty': '无匹配结果',
     'history.actions.copy': '复制到剪贴板', 'history.actions.island': '推送到 WinIsland 灵动岛', 'history.actions.remove': '移除',
@@ -151,6 +155,7 @@ const I18N = {
     'hero.wait': 'Waiting for code', 'hero.waitSub': 'Codes sent from your phone will appear here',
     'hero.copy': 'Copy', 'hero.island': 'Island', 'hero.clear': 'Clear',
     'history.msg.defaultApp': 'SMS', 'history.title': 'History', 'history.clearAll': 'Clear All',
+    'stats.title': 'Statistics', 'stats.today': 'Today', 'stats.total': 'Total', 'stats.dist': "Today's sources", 'stats.empty': 'No data today',
     'history.empty': 'No history yet',
     'history.searchPh': 'Search code / app / source…', 'history.searchEmpty': 'No matches',
     'history.actions.copy': 'Copy to clipboard', 'history.actions.island': 'Push to WinIsland', 'history.actions.remove': 'Remove',
@@ -276,8 +281,44 @@ function showEmpty() {
   els.heroContent.classList.add('hidden');
 }
 
+/* ---------------- 统计面板 ---------------- */
+function renderStats() {
+  const todayKey = new Date().toDateString();
+  let today = 0;
+  const appCount = new Map();
+  for (const c of codes) {
+    const d = new Date(c.time);
+    const app = (c.app || t('history.msg.defaultApp') || '?').trim();
+    if (!Number.isNaN(d.getTime()) && d.toDateString() === todayKey) {
+      today++;
+      appCount.set(app, (appCount.get(app) || 0) + 1);
+    }
+  }
+  els.statToday.textContent = String(today);
+  els.statTotal.textContent = String(codes.length);
+  const top = [...appCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  if (top.length === 0) {
+    els.statsApps.innerHTML = '<div class="stats-empty">' + t('stats.empty') + '</div>';
+    return;
+  }
+  const max = top[0][1];
+  els.statsApps.innerHTML = '';
+  for (const [app, count] of top) {
+    const row = document.createElement('div');
+    row.className = 'stats-row';
+    const pct = Math.round((count / max) * 100);
+    row.innerHTML = `
+      <span class="stats-app" title="${escapeHtml(app)}">${escapeHtml(app)}</span>
+      <div class="stats-bar"><div class="stats-bar-fill" style="width:${pct}%"></div></div>
+      <span class="stats-count">${count}</span>
+    `;
+    els.statsApps.appendChild(row);
+  }
+}
+
 /* ---------------- 历史列表 ---------------- */
 function renderHistory() {
+  renderStats();
   const query = searchQuery.trim().toLowerCase();
   const shown = query
     ? codes.filter((c) =>
