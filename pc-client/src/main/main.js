@@ -5,6 +5,7 @@
  */
 const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell } = require('electron');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -387,6 +388,61 @@ function playBeep() {
   try { shell.beep(); } catch {}
 }
 
+// ---------------------------------------------------------------- 自动更新（GitHub Releases）
+const UPDATE_RELEASE_URL = 'https://api.github.com/repos/DMP-Pig/CodeBridge/releases/latest';
+
+function parseVersionNum(v) {
+  return String(v || '').replace(/^v/i, '').split(/[.\-]/).map((x) => {
+    const n = parseInt(x, 10);
+    return Number.isNaN(n) ? 0 : n;
+  });
+}
+
+/** 判断 a 是否比 b 新（1.0.2beta1 > 1.0.1） */
+function isNewerVersion(a, b) {
+  const pa = parseVersionNum(a);
+  const pb = parseVersionNum(b);
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na !== nb) return na > nb;
+  }
+  return false;
+}
+
+/** 启动时检查 GitHub Releases 最新版，发现新版本通知渲染进程 */
+function checkForUpdates() {
+  const req = https.get(UPDATE_RELEASE_URL, {
+    headers: { 'User-Agent': APP_NAME, Accept: 'application/vnd.github+json' },
+    timeout: 8000,
+  }, (res) => {
+    let body = '';
+    res.on('data', (c) => { body += c; });
+    res.on('end', () => {
+      let info = null;
+      try {
+        const data = JSON.parse(body);
+        const latest = String(data.tag_name || '').replace(/^v/i, '');
+        if (isNewerVersion(latest, APP_VERSION)) {
+          info = {
+            version: latest,
+            name: data.name || data.tag_name || '',
+            notes: String((data.body || '').slice(0, 600)),
+            url: data.html_url || 'https://github.com/DMP-Pig/CodeBridge/releases',
+            downloadUrl: (Array.isArray(data.assets) && data.assets[0] && data.assets[0].browser_download_url) || data.html_url || 'https://github.com/DMP-Pig/CodeBridge/releases',
+          };
+        }
+      } catch (err) {
+        console.error('解析更新信息失败:', err);
+      }
+      emitToRenderer('update:result', info ? { type: 'available', info } : { type: 'latest', info: null });
+    });
+  });
+  req.on('error', (err) => emitToRenderer('update:result', { type: 'error', info: null }));
+  req.on('timeout', () => { req.destroy(); emitToRenderer('update:result', { type: 'error', info: null }); });
+}
+
 // ---------------------------------------------------------------- 渲染进程通信
 function emitToRenderer(channel, payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -525,6 +581,7 @@ function registerIpc() {
   });
   ipcMain.handle('window:close', () => mainWindow && mainWindow.close());
   ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
+  ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
 }
 
 // ---------------------------------------------------------------- 生命周期
@@ -560,6 +617,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   startServer().catch(() => {});
+  if (!VERIFY && !VERIFY_SHOT) setTimeout(checkForUpdates, 4000);
   if (VERIFY || VERIFY_SHOT) runVerify();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

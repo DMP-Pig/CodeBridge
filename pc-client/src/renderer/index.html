@@ -36,6 +36,18 @@
     </div>
   </header>
 
+  <!-- 更新提示条 -->
+  <div class="update-banner hidden" id="updateBanner">
+    <div class="update-info">
+      <div class="update-title" id="updateTitle"></div>
+      <div class="update-notes" id="updateNotes"></div>
+    </div>
+    <div class="update-actions">
+      <button class="pill-btn" id="btnUpdateDownload">下载更新</button>
+      <button class="text-btn" id="btnUpdateDismiss">忽略</button>
+    </div>
+  </div>
+
   <main class="layout">
     <!-- 左栏：主视图 -->
     <section class="main-col">
@@ -220,6 +232,13 @@
 
       <section class="set-group">
         <h3 class="set-group-title">界面</h3>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name">检查更新</div>
+            <div class="set-desc">检查 GitHub 上是否有新版本</div>
+          </div>
+          <button class="pill-btn" id="btnCheckUpdate">检查更新</button>
+        </div>
         <div class="set-row">
           <div class="set-info">
             <div class="set-name">强调色</div>

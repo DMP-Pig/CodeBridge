@@ -19,8 +19,9 @@ contextBridge.exposeInMainWorld('p2p', {
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
   on: (channel, cb) => {
-    const allowed = ['code:new', 'server:status', 'action:notice'];
+    const allowed = ['code:new', 'server:status', 'action:notice', 'update:result'];
     if (allowed.includes(channel)) {
       const listener = (_e, payload) => cb(payload);
       ipcRenderer.on(channel, listener);

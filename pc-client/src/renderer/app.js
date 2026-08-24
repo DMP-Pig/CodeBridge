@@ -30,12 +30,19 @@ const els = {
   btnMin: $('#btnMin'),
   btnMax: $('#btnMax'),
   btnClose: $('#btnClose'),
+  updateBanner: $('#updateBanner'),
+  updateTitle: $('#updateTitle'),
+  updateNotes: $('#updateNotes'),
+  btnUpdateDownload: $('#btnUpdateDownload'),
+  btnUpdateDismiss: $('#btnUpdateDismiss'),
+  btnCheckUpdate: $('#btnCheckUpdate'),
 };
 
 let settings = {};
 let codes = [];
 let currentId = null;
 let activeHeroId = null;
+let updateInfo = null;
 
 /* ---------------- 时间格式化 ---------------- */
 function fmtTime(iso) {
@@ -304,6 +311,29 @@ els.btnClearHistory.addEventListener('click', async () => {
 els.btnCopyHero.addEventListener('click', () => handleAction('copy', activeHeroId));
 els.btnIslandHero.addEventListener('click', () => handleAction('island', activeHeroId));
 els.btnClearHero.addEventListener('click', () => handleAction('remove', activeHeroId));
+
+/* ---------------- 更新 ---------------- */
+api.on('update:result', (r) => {
+  if (!r) return;
+  if (r.type === 'available' && r.info) {
+    updateInfo = r.info;
+    els.updateTitle.textContent = `发现新版本 v${r.info.version}`;
+    els.updateNotes.textContent = r.info.notes || '点击下载安装最新版本';
+    els.updateBanner.classList.remove('hidden');
+  } else if (r.type === 'latest') {
+    toast('ok', '已是最新版本');
+  } else {
+    toast('err', '检查更新失败（可能是网络问题）');
+  }
+});
+els.btnUpdateDownload.addEventListener('click', () => {
+  if (updateInfo) { const u = updateInfo.downloadUrl || updateInfo.url; if (u) api.openExternal(u); }
+});
+els.btnUpdateDismiss.addEventListener('click', () => els.updateBanner.classList.add('hidden'));
+els.btnCheckUpdate.addEventListener('click', () => {
+  toast('ok', '正在检查更新…');
+  api.checkUpdate();
+});
 
 /* 键盘：Esc 关闭抽屉 */
 document.addEventListener('keydown', (e) => {
