@@ -39,6 +39,8 @@ const DEFAULT_SETTINGS = {
   ui: {
     accent: '#6ea8ff',
     keepHistory: 50,        // 保留历史条数
+    theme: 'dark',          // 'dark' | 'light' 深浅色主题
+    language: 'zh',         // 'zh' | 'en' 界面语言
   },
 };
 
@@ -182,7 +184,7 @@ function autoCopyWithRestore(code) {
       clipboardRestoreValue = null;
       if (prev != null) {
         copyText(prev);
-        emitToRenderer('action:notice', { kind: 'copy', text: '剪贴板已恢复为原内容' });
+        emitToRenderer('action:notice', { kind: 'copy', text: mainT('剪贴板已恢复为原内容', 'Clipboard restored') });
       }
     }, secs * 1000);
   }
@@ -345,12 +347,12 @@ function handleAutoActions(entry) {
   // 自动复制
   if (settings.behavior.autoCopy) {
     autoCopyWithRestore(entry.code);
-    emitToRenderer('action:notice', { kind: 'copy', text: '已自动复制到剪贴板' });
+    emitToRenderer('action:notice', { kind: 'copy', text: mainT('已自动复制到剪贴板', 'Auto-copied to clipboard') });
   }
   // 自动上岛
   if (settings.behavior.autoIsland) {
     pushToIsland(entry)
-      .then(() => emitToRenderer('action:notice', { kind: 'island', text: '已自动上岛' }))
+      .then(() => emitToRenderer('action:notice', { kind: 'island', text: mainT('已自动上岛', 'Auto-pushed to island') }))
       .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: err.message }));
   }
 }
@@ -386,6 +388,12 @@ function stopServer() {
 function playBeep() {
   if (!settings.behavior.playSound) return;
   try { shell.beep(); } catch {}
+}
+
+
+/** 语言敏感文案：根据设置中的语言返回中/英文 */
+function mainT(zh, en) {
+  return (settings.ui && settings.ui.language === 'en') ? en : zh;
 }
 
 // ---------------------------------------------------------------- 自动更新（GitHub Releases）
