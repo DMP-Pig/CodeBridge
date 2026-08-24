@@ -1,34 +1,40 @@
-# PhoneToPCCopyCode · 手机验证码 → PC 桥接
+# CodeBridge
 
-手机收到短信验证码后，通过**局域网**自动传送到 PC，PC 端以液态玻璃风格界面展示，
-并可一键「上岛」（推送到 WinIsland 灵动岛）或「复制到剪贴板」。所有行为均可配置。
+> Bridge SMS verification codes from your phone to PC over LAN. Display, one-click copy, fully configurable. Modern glassmorphism UI.
+>
+> 通过局域网将手机验证码桥接至 PC。展示、一键复制、全功能可配置。现代化玻璃拟态 UI。
 
-## 目录结构（PC 端与手机端代码分开存放）
+When your phone receives an SMS verification code, CodeBridge forwards it to your PC over the local network in real time. The PC client shows it in a modern glassmorphism UI with rounded corners and animations, and can push it to the WinIsland dynamic island or copy it to the clipboard — all fully configurable.
+
+手机收到短信验证码后，CodeBridge 通过局域网实时转发到 PC。PC 端以液态玻璃（玻璃拟态）风格界面展示，支持推送到 WinIsland 灵动岛、一键/自动复制到剪贴板，所有行为均可配置。
+
+## Features / 功能
+
+- Real-time forwarding of SMS codes from phone to PC over LAN / 手机 → PC 局域网实时转发
+- Glassmorphism UI with rounded corners and animations / 液态玻璃拟态 UI（圆角 + 动画）
+- One-click copy, auto-copy, and **auto-restore clipboard** after N seconds / 一键复制、自动复制、自动复制后 N 秒恢复原剪贴板
+- Push to WinIsland dynamic island (auto / manual), single-line compact display, does not widen the island / 推送到 WinIsland 灵动岛（自动/手动），单行紧凑显示，不影响灵动岛宽度
+- Fully configurable: PC host, port, token, auto-forward, auto-copy, auto-island, restore duration, icon, regex / 全部可配置：PC 地址、端口、Token、自动转发、自动复制、自动上岛、恢复时长、图标、正则
+- Desktop clients for Windows / macOS / Linux, mobile client as Android APK / PC 端支持 Windows / macOS / Linux，手机端为 Android APK
+
+## Structure / 目录结构（PC 端与手机端代码分离）
 
 ```
-PhoneToPCCopyCode/
-├── pc-client/            ← PC 端（Windows / macOS / Linux，Electron）
-│   ├── src/main/         主进程（局域网服务、上岛、剪贴板、设置）
-│   └── src/renderer/     液态玻璃 UI（index.html / styles.css / app.js）
-├── android-app/          ← 手机端（Android APK，Kotlin + Jetpack Compose）
-│   ├── app/src/main/java/.../data      设置、验证码提取、发送
-│   ├── app/src/main/java/.../service   通知监听、短信广播
-│   ├── app/src/main/java/.../ui        Compose 界面
-│   └── app/src/main/res/               资源与图标
-├── docs/                 文档（架构 / 协议 / 构建）
-├── releases/<版本号>/     发布产物（APK、PC 安装包等）
+CodeBridge/
+├── pc-client/        PC 客户端（Windows / macOS / Linux，Electron）
+│   ├── src/main/     主进程：局域网服务、上岛、剪贴板、设置
+│   └── src/renderer/ 玻璃拟态 UI（index.html / styles.css / app.js）
+├── android-app/      手机客户端（Android APK，Kotlin + Jetpack Compose）
+│   └── app/src/main/java/com/phonetopc/copycode/
+│       ├── data/     设置、验证码提取、发送
+│       ├── service/  通知监听、短信广播
+│       └── ui/       Compose 界面
+├── docs/             文档（架构 / 协议 / 构建）
+├── releases/<version>/  发布产物（APK、PC 安装包等）
 └── README.md
 ```
 
-两个客户端互相独立、互不依赖：PC 端只负责接收与展示，手机端只负责采集与发送，通过局域网 HTTP 通信（见 `docs/协议说明.md`）。
-## 客户端
-
-| 平台 | 技术栈 | 目录 |
-|---|---|---|
-| Windows / macOS / Linux | Electron | `pc-client/` |
-| Android (APK) | Kotlin + Jetpack Compose | `android-app/` |
-
-## 快速开始（PC 端）
+## Quick Start (PC) / PC 端快速开始
 
 ```bash
 cd pc-client
@@ -36,32 +42,35 @@ npm install
 npm start
 ```
 
-首次运行后在「设置」中查看局域网地址（如 `http://192.168.1.100:9841`），
-在手机端填写该地址即可。
+Open **Settings** to view the LAN address (e.g. `http://192.168.1.100:9841`), then fill it in on the phone app.
+在「设置」中查看局域网地址（如 `http://192.168.1.100:9841`），然后在手机端填写该地址。
 
-## 快速开始（手机端）
+## Quick Start (Android) / 手机端快速开始
 
-用 Android Studio 打开 `android-app/`，构建 APK 安装到手机。
-在 App 内开启「通知监听」权限（用于读取短信验证码通知），
-填写 PC 的局域网地址与 Token 后即可自动转发。
+1. Build the APK (see `docs/构建指南.md`) or use a prebuilt release.
+2. Grant **Notification access** (通知使用权) in the app — required to read SMS-code notifications.
+3. Fill in the PC LAN address and Token, then enable auto-forward.
+4. PC client: enable auto-copy / auto-island / clipboard-restore in Settings as needed.
 
-## 当前状态（1.0.0beta1）
+## WinIsland Integration / 与 WinIsland 联动
 
-- **两端产物均已构建**，位于 `releases/1.0.0beta1/`：
-  - `PhoneToPCCopyCode-1.0.0beta1-android.apk`（手机端）
-  - `PhoneToPCCopyCode-1.0.0beta1-windows-installer.exe`（PC 安装包）
-  - `PhoneToPCCopyCode-1.0.0beta1-windows-x64-portable.exe`（PC 便携版）
-- PC 端已实测：局域网服务、验证码展示、剪贴板复制（手动/自动/灵动岛按钮）、WinIsland 上岛推送均通过。
-- 手机端 APK 已用本机 SDK + Gradle 8.8 + 阿里云镜像实测编译成功（debug 版可直接安装）。
-- 测试方法：`cd pc-client && npm start`，然后 `curl -X POST http://127.0.0.1:9841/api/code -H "Content-Type: application/json" -d '{"code":"123456"}'`。
+The PC client's “上岛” action calls WinIsland's push API (default `http://127.0.0.1:9840`),
+showing the code as a dynamic-island card. Enable “上岛 API” in WinIsland settings and configure the Token first.
+See `docs/协议说明.md` for the protocol.
 
-## 与 WinIsland 联动
+PC 端「上岛」会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9840`），把验证码以灵动岛卡片展示。需先在 WinIsland 设置中启用「上岛 API」并配置 Token。
 
-PC 端「上岛」按钮会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9840`），
-把验证码以灵动岛卡片形式展示。需先在 WinIsland 设置中启用「上岛 API」并配置 Token。
+## Troubleshooting / 疑难排查
 
-## 版本
+- Phone cannot install any APK (`INSTALL_FAILED_VERIFICATION_FAILURE`) on some custom ROMs:
+  see `docs/手机端疑难排查.md` — set `adb shell setprop persist.sys.whitelistapp false`.
+- Phone cannot reach PC (`Cleartext HTTP traffic ... not permitted`): the app already enables cleartext HTTP.
 
-当前版本：`1.0.0beta1`（Beta / 迭代版本，不上传远端，仅本地保留）。
-发布产物统一存放于 `releases/<版本号>/`，命名规则见《通用文件管理要求》。
+## Version / 版本
 
+Current version: `1.0.0` (official release). Beta builds stay local only; official releases are published to GitHub.
+当前版本：`1.0.0`（正式版）。Beta 版本仅本地保留，正式版上传 GitHub。
+
+## License / 许可
+
+MIT

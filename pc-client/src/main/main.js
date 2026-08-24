@@ -10,7 +10,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 
-const APP_NAME = 'PhoneToPCCopyCode';
+const APP_NAME = 'CodeBridge';
 const APP_VERSION = app.getVersion();
 const VERIFY = process.argv.includes('--verify');
 const VERIFY_SHOT = process.argv.includes('--screenshot');
@@ -40,6 +40,9 @@ const DEFAULT_SETTINGS = {
     keepHistory: 50,        // 保留历史条数
   },
 };
+
+// 保持用户数据目录稳定（沿用旧路径，避免升级丢设置）
+app.setPath('userData', path.join(app.getPath('appData'), 'PhoneToPCCopyCode'));
 
 let settings = loadSettings();
 let codeHistory = [];       // 最新在前

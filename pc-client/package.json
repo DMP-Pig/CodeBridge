@@ -1,10 +1,13 @@
 {
   "name": "phonetopccopycode-pc",
-  "productName": "PhoneToPCCopyCode",
-  "version": "1.0.0-beta.1",
-  "description": "手机短信验证码 → PC 桥接：局域网接收、展示、上岛、复制到剪贴板",
+  "productName": "CodeBridge",
+  "version": "1.0.0",
+  "description": "Bridge SMS verification codes from your phone to PC over LAN. Display, one-click copy, fully configurable. Modern glassmorphism UI.",
   "main": "src/main/main.js",
-  "author": "PhoneToPCCopyCode",
+  "author": {
+    "name": "DMP-Pig",
+    "email": "zhuzai2985259740@outlook.com"
+  },
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -17,7 +20,7 @@
   },
   "build": {
     "appId": "com.phonetopc.copycode",
-    "productName": "PhoneToPCCopyCode",
+    "productName": "CodeBridge",
     "directories": {
       "output": "dist"
     },
@@ -29,23 +32,43 @@
     "win": {
       "icon": "assets/icon.png",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "mac": {
       "icon": "assets/icon.png",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "category": "public.app-category.utilities"
     },
     "linux": {
       "icon": "assets/icon.png",
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Utility"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
     }
+  },
+  "homepage": "https://github.com/DMP-Pig/CodeBridge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DMP-Pig/CodeBridge.git"
   }
 }
