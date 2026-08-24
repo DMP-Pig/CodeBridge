@@ -42,6 +42,9 @@ const els = {
   btnCheckUpdate: $('#btnCheckUpdate'),
   setSystemNotify: $('#setSystemNotify'),
   setAutoClean: $('#setAutoClean'),
+  pairQr: $('#pairQr'),
+  pairQrHint: $('#pairQrHint'),
+  btnRefreshQr: $('#btnRefreshQr'),
 };
 
 let settings = {};
@@ -114,6 +117,7 @@ const I18N = {
     'set.serverEnabled': '启用服务', 'set.serverEnabledDesc': '开启后手机可通过局域网发送验证码',
     'set.port': '监听端口', 'set.portDesc': '修改后服务自动重启',
     'set.token': '访问令牌 Token', 'set.tokenDesc': '手机端需携带相同 Token，防止局域网误连', 'set.tokenPh': '留空则不校验',
+    'set.pair': '扫码配对', 'set.pairDesc': '手机打开 CodeBridge 点「扫码配对」扫一扫，自动填入地址与令牌', 'set.pairRefresh': '刷新二维码',
     'set.autoDisplay': '自动展示', 'set.autoDisplayDesc': '收到后弹出悬浮提示并置顶展示',
     'set.autoCopy': '自动复制', 'set.autoCopyDesc': '收到后立即复制到剪贴板',
     'set.copyRestore': '复制后恢复原剪贴板', 'set.copyRestoreDesc': '复制验证码后，过一段时间自动恢复为之前的剪贴板内容',
@@ -165,6 +169,7 @@ const I18N = {
     'set.serverEnabled': 'Enable Service', 'set.serverEnabledDesc': 'Phone can send codes over LAN when enabled',
     'set.port': 'Port', 'set.portDesc': 'Service restarts automatically',
     'set.token': 'Access Token', 'set.tokenDesc': 'Phone must use the same token to prevent wrong connections', 'set.tokenPh': 'Empty = no token check',
+    'set.pair': 'QR Pairing', 'set.pairDesc': 'Open CodeBridge on your phone, tap "Scan QR" and scan to auto-fill address & token', 'set.pairRefresh': 'Refresh QR',
     'set.autoDisplay': 'Auto Display', 'set.autoDisplayDesc': 'Show a floating alert on arrival',
     'set.autoCopy': 'Auto Copy', 'set.autoCopyDesc': 'Copy to clipboard immediately',
     'set.copyRestore': 'Restore Original Clipboard', 'set.copyRestoreDesc': 'Restore previous clipboard content after a delay',
@@ -387,10 +392,23 @@ function openDrawer() {
   els.drawer.classList.add('open');
   els.drawerScrim.classList.add('open');
   fillSettingsForm();
+  loadPairQr();
 }
 function closeDrawer() {
   els.drawer.classList.remove('open');
   els.drawerScrim.classList.remove('open');
+}
+
+async function loadPairQr() {
+  try {
+    const qr = await api.getPairingQr();
+    if (!qr || !qr.dataUrl) return;
+    els.pairQr.src = qr.dataUrl;
+    const parts = [];
+    if (qr.ips && qr.ips.length > 1) parts.push(qr.ips.join(' / '));
+    parts.push('Token: ' + (qr.payload.token || t('set.tokenPh')));
+    els.pairQrHint.textContent = parts.join(' · ');
+  } catch (e) { /* 忽略二维码加载失败 */ }
 }
 
 function fillSettingsForm() {
@@ -512,6 +530,7 @@ els.btnTestIsland.addEventListener('click', async () => {
   if (res && res.ok) toast('island', t('toast.islandTestOk'));
   else toast('err', (res && res.error) || t('toast.islandConnFail'));
 });
+els.btnRefreshQr.addEventListener('click', loadPairQr);
 els.historySearch.addEventListener('input', (e) => {
   searchQuery = e.target.value;
   renderHistory();

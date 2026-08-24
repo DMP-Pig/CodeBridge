@@ -11,6 +11,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
+const QRCode = require('qrcode');
 
 const APP_NAME = 'CodeBridge';
 const APP_VERSION = app.getVersion();
@@ -672,6 +673,31 @@ function registerIpc() {
   ipcMain.handle('window:close', () => mainWindow && mainWindow.close());
   ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
   ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
+
+  // 扫码配对：生成包含本机地址 / 端口 / Token 的二维码
+  ipcMain.handle('pairing:qr', async () => {
+    const ips = getLanIps();
+    const host = ips[0] || '127.0.0.1';
+    const payload = {
+      app: 'CodeBridge',
+      name: APP_NAME,
+      version: APP_VERSION,
+      host,
+      port: settings.server.port,
+      token: settings.server.token || '',
+      id: deviceId,
+    };
+    let dataUrl = '';
+    try {
+      dataUrl = await QRCode.toDataURL(JSON.stringify(payload), {
+        width: 360, margin: 1, errorCorrectionLevel: 'M',
+        color: { dark: '#0b1220ff', light: '#ffffffff' },
+      });
+    } catch (err) {
+      console.error('生成二维码失败:', err);
+    }
+    return { dataUrl, payload, ips };
+  });
 }
 
 // ---------------------------------------------------------------- 生命周期

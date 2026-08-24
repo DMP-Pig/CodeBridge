@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('p2p', {
   close: () => ipcRenderer.invoke('window:close'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
+  getPairingQr: () => ipcRenderer.invoke('pairing:qr'),
   on: (channel, cb) => {
     const allowed = ['code:new', 'server:status', 'action:notice', 'update:result'];
     if (allowed.includes(channel)) {

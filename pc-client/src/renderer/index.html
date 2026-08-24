@@ -161,6 +161,17 @@
           </div>
           <input class="field" id="setToken" type="text" data-i18n-placeholder="set.tokenPh" placeholder="留空则不校验" />
         </div>
+        <div class="set-row pair-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.pair">扫码配对</div>
+            <div class="set-desc" data-i18n="set.pairDesc">手机打开 CodeBridge 点「扫码配对」扫一扫，自动填入地址与令牌</div>
+          </div>
+          <button class="pill-btn" id="btnRefreshQr" data-i18n="set.pairRefresh">刷新二维码</button>
+        </div>
+        <div class="pair-qr-wrap">
+          <img class="pair-qr" id="pairQr" alt="pairing QR" />
+          <div class="pair-qr-hint" id="pairQrHint"></div>
+        </div>
       </section>
 
       <section class="set-group">

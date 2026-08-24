@@ -3,7 +3,9 @@ package com.phonetopc.copycode.ui
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.app.Activity
 import android.content.pm.PackageManager
+import org.json.JSONObject
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -85,6 +88,55 @@ fun MainScreen() {
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { }
+
+    // 扫码配对：扫描 PC 端二维码后自动填入地址 / 端口 / Token
+    val scanLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val text = result.data?.getStringExtra(QrScanActivity.EXTRA_RESULT)
+            if (text.isNullOrBlank()) {
+                statusMsg = "未识别到二维码"
+                statusOk = false
+                return@rememberLauncherForActivityResult
+            }
+            try {
+                val obj = JSONObject(text)
+                val h = obj.optString("host").trim()
+                val appTag = obj.optString("app")
+                if (h.isBlank() || (appTag.isNotBlank() && appTag != "CodeBridge")) {
+                    throw IllegalArgumentException("not CodeBridge payload")
+                }
+                val p = obj.optInt("port", AppSettings.DEFAULT_PORT).coerceIn(1, 65535)
+                val tk = obj.optString("token")
+                host = h
+                port = p.toString()
+                token = tk
+                settings.pcHost = h
+                settings.pcPort = p
+                settings.token = tk
+                statusMsg = "扫码配对成功：$h:$p"
+                statusOk = true
+            } catch (e: Exception) {
+                statusMsg = "二维码内容无效，请扫描 CodeBridge 配对码"
+                statusOk = false
+            }
+        } else {
+            statusMsg = "已取消扫码"
+            statusOk = false
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            scanLauncher.launch(Intent(context, QrScanActivity::class.java))
+        } else {
+            statusMsg = "需要相机权限才能扫码配对"
+            statusOk = false
+        }
+    }
 
     // 背景光斑动画
     val transition = rememberInfiniteTransition(label = "blob")
@@ -213,6 +265,19 @@ fun MainScreen() {
                                 statusOk = true
                             }
                         }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                GlassButton(
+                    text = "扫码配对",
+                    icon = Icons.Default.QrCodeScanner,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    val ctx = context
+                    if (ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                        scanLauncher.launch(Intent(ctx, QrScanActivity::class.java))
+                    } else {
+                        cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -395,8 +460,8 @@ fun MainScreen() {
             GlassCard {
                 CardHeader(Icons.Default.Sms, "使用步骤")
                 Text(
-                    text = "1. 在 PC 端启动 PhoneToPCCopyCode，记录端口与 Token\n" +
-                        "2. 在上方填写 PC 局域网地址（同一 WiFi 下）\n" +
+                    text = "1. 在 PC 端打开 CodeBridge 设置中的「扫码配对」二维码\n" +
+                        "2. 在本页点「扫码配对」扫一扫（或手动填写地址/端口/Token）\n" +
                         "3. 开启「通知使用权」，授予短信权限\n" +
                         "4. 保持「自动转发」开启，收到验证码即自动上送",
                     color = TextDim,
