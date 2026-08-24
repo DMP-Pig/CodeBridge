@@ -32,3 +32,11 @@ releases/**/*.zip
 releases/**/*.dmg
 releases/**/*.AppImage
 releases/**/*.deb
+
+# 临时诊断截图与运行时数据
+releases/*.png
+pc-client/Tencent/
+pc-client/out/
+__pycache__/
+*.tmp
+
