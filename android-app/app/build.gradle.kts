@@ -1,3 +1,5 @@
+import java.io.File
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -13,8 +15,22 @@ android {
         applicationId = "com.phonetopc.copycode"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.0.1"
+        versionCode = 5
+        versionName = "1.0.2beta1"
+    }
+
+    signingConfigs {
+        // Local release signing: credentials injected via env vars (never committed).
+        // When env vars are absent, the release build is unsigned (CI/debug unaffected).
+        val keystoreFile = System.getenv("CODEBRIDGE_KEYSTORE")?.let { File(it) }?.takeIf { it.exists() }
+        if (keystoreFile != null && System.getenv("CODEBRIDGE_KEYSTORE_PASS") != null) {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = System.getenv("CODEBRIDGE_KEYSTORE_PASS")
+                keyAlias = System.getenv("CODEBRIDGE_KEY_ALIAS") ?: "phonetopc"
+                keyPassword = System.getenv("CODEBRIDGE_KEY_PASS") ?: System.getenv("CODEBRIDGE_KEYSTORE_PASS")
+            }
+        }
     }
 
     buildTypes {
@@ -24,6 +40,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {
