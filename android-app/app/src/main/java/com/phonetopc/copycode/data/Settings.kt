@@ -54,6 +54,16 @@ class Settings private constructor(context: Context) {
         get() = sp.getBoolean(KEY_TEST_MODE, false)
         set(v) = sp.edit().putBoolean(KEY_TEST_MODE, v).apply()
 
+    /** Floating bubble: show code in an overlay on the phone screen */
+    var floatBubble: Boolean
+        get() = sp.getBoolean(KEY_FLOAT_BUBBLE, true)
+        set(v) = sp.edit().putBoolean(KEY_FLOAT_BUBBLE, v).apply()
+
+    /** Bubble display duration in seconds */
+    var bubbleSeconds: Int
+        get() = sp.getInt(KEY_BUBBLE_SECONDS, 15)
+        set(v) = sp.edit().putInt(KEY_BUBBLE_SECONDS, v.coerceIn(5, 120)).apply()
+
     // ---------------- 多 PC 配置 ----------------
 
     /** 已保存的 PC 配置列表（首次使用时会用旧字段迁移出 1 条） */
@@ -186,6 +196,8 @@ class Settings private constructor(context: Context) {
         private const val KEY_CONFIGS = "pc_configs"
         private const val KEY_ACTIVE = "pc_active"
         const val DEFAULT_PORT = 9841
+        private const val KEY_FLOAT_BUBBLE = "float_bubble"
+        private const val KEY_BUBBLE_SECONDS = "bubble_seconds"
 
         @Volatile
         private var instance: Settings? = null

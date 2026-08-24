@@ -28,6 +28,7 @@ class SmsReceiver : BroadcastReceiver() {
         if (body.isBlank()) return
 
         val code = CodeExtractor.extract(body, settings.customRegex) ?: return
+        CodeBubble.show(context, code, "\u77ed\u4fe1")
 
         val result = goAsync()
         Thread {

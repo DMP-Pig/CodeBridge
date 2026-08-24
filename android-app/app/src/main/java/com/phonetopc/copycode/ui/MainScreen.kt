@@ -61,6 +61,7 @@ import com.phonetopc.copycode.data.PcConfig
 import com.phonetopc.copycode.data.FoundPc
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings as AppSettings
+import com.phonetopc.copycode.service.CodeBubble
 import com.phonetopc.copycode.ui.theme.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -98,6 +99,9 @@ fun MainScreen() {
         )
     }
     var batteryWhitelisted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
+    var floatBubble by remember { mutableStateOf(settings.floatBubble) }
+    var bubbleSeconds by remember { mutableStateOf(settings.bubbleSeconds.toString()) }
+    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     // 从系统设置页返回时刷新权限 / 保活状态
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -109,6 +113,7 @@ fun MainScreen() {
                     ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECEIVE_SMS) ==
                         PackageManager.PERMISSION_GRANTED
                 batteryWhitelisted = isIgnoringBatteryOptimizations(context)
+                overlayGranted = Settings.canDrawOverlays(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -507,6 +512,8 @@ fun MainScreen() {
                         settings.applyActive(saveHost, savePort, token)
                         settings.autoSend = autoSend
                         settings.customRegex = customRegex
+                        settings.floatBubble = floatBubble
+                        settings.bubbleSeconds = bubbleSeconds.toIntOrNull() ?: 15
                         configs = settings.pcConfigs()
                         activeIdx = settings.activeIndex()
                         statusMsg = if (settings.isValid()) "设置已保存" else "请填写 PC 地址"
@@ -597,6 +604,47 @@ fun MainScreen() {
             }
 
             // 使用说明
+            // Floating bubble settings
+            GlassCard {
+                CardHeader(Icons.Default.Notifications, "悬浮气泡")
+                ToggleRow(
+                    title = "悬浮气泡",
+                    desc = "收到验证码后在屏幕上方弹出气泡，点击可复制",
+                    checked = floatBubble,
+                    onCheckedChange = { floatBubble = it },
+                )
+                if (floatBubble && !overlayGranted) {
+                    Spacer(Modifier.height(6.dp))
+                    PermissionRow(
+                        title = "悬浮窗权限",
+                        desc = "用于在屏幕上显示验证码气泡",
+                        enabled = false,
+                    ) {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:" + context.packageName)
+                        )
+                        context.startActivity(intent)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                GlassTextField(
+                    value = bubbleSeconds,
+                    onValueChange = { v -> bubbleSeconds = v.filter { it.isDigit() }.take(3) },
+                    label = "显示时长（秒）",
+                    placeholder = "15",
+                )
+                Spacer(Modifier.height(10.dp))
+                GlassButton(
+                    text = "测试气泡",
+                    icon = Icons.Default.Notifications,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    CodeBubble.show(context, "123456", "测试")
+                    statusMsg = "已弹出测试气泡"
+                    statusOk = true
+                }
+            }
             GlassCard {
                 CardHeader(Icons.Default.Sms, "使用步骤")
                 Text(

@@ -119,6 +119,9 @@ class SmsNotificationListener : NotificationListenerService() {
         if (!recent.add(dedupKey)) return
         if (recent.size > 500) recent.clear()
 
+        // Floating bubble: show the code on the phone screen (tap to copy)
+        CodeBubble.show(applicationContext, code, friendlyAppName(sbn.packageName))
+
         val source = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: sbn.packageName
         Thread {
             val result = CodeSender.send(
