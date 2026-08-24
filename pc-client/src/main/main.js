@@ -10,6 +10,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
 
 const APP_NAME = 'CodeBridge';
 const APP_VERSION = app.getVersion();
@@ -30,6 +31,7 @@ const DEFAULT_SETTINGS = {
     autoIsland: false,      // 收到验证码自动推送到 WinIsland
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
+    autoInput: false,       // 收到验证码自动输入到当前焦点输入框
   },
   island: {
     baseUrl: 'http://127.0.0.1:9840',
@@ -370,6 +372,52 @@ async function handleRequest(req, res) {
   sendJson(res, 404, { ok: false, error: 'not found' });
 }
 
+/**
+ * 模拟键盘输入验证码到当前聚焦的输入框（跨平台）
+ * Windows: PowerShell WScript.Shell SendKeys（临时脚本，UTF-16LE）
+ * macOS:   osascript System Events keystroke（需辅助功能权限）
+ * Linux:   xdotool type（需已安装 xdotool）
+ */
+function escapeSendKeys(s) {
+  const special = ['+', '^', '%', '~', '(', ')', '[', ']', '<', '>'];
+  let out = '';
+  for (const ch of String(s)) {
+    if (ch === '{') out += '{{}';
+    else if (ch === '}') out += '{}}';
+    else if (special.includes(ch)) out += `{${ch}}`;
+    else out += ch;
+  }
+  return out;
+}
+
+function simulateTyping(text) {
+  const t = String(text || '');
+  if (!t) return;
+  if (process.platform === 'win32') {
+    const psFile = path.join(os.tmpdir(), `cb_type_${Date.now()}_${Math.floor(Math.random() * 1e6)}.ps1`);
+    const keys = escapeSendKeys(t).replace(/'/g, "''");
+    const script = `$w = New-Object -ComObject WScript.Shell\n$w.SendKeys('${keys}')\n`;
+    try {
+      fs.writeFileSync(psFile, '\ufeff' + script, 'utf16le');
+      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', psFile], () => {
+        try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
+      });
+    } catch (err) {
+      console.error('自动输入失败:', err);
+      try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
+    }
+  } else if (process.platform === 'darwin') {
+    const script = `tell application "System Events" to keystroke ${JSON.stringify(t)}`;
+    execFile('osascript', ['-e', script], (err) => {
+      if (err) console.error('自动输入失败(macOS):', err.message);
+    });
+  } else if (process.platform === 'linux') {
+    execFile('xdotool', ['type', '--delay', '40', t], (err) => {
+      if (err) console.error('自动输入失败(Linux):', err.message);
+    });
+  }
+}
+
 function handleAutoActions(entry) {
   // 自动复制
   if (settings.behavior.autoCopy) {
@@ -381,6 +429,13 @@ function handleAutoActions(entry) {
     pushToIsland(entry)
       .then(() => emitToRenderer('action:notice', { kind: 'island', text: mainT('已自动上岛', 'Auto-pushed to island') }))
       .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: err.message }));
+  }
+  // 自动输入到当前焦点输入框（延迟片刻，避免打断用户当前操作）
+  if (settings.behavior.autoInput) {
+    setTimeout(() => {
+      simulateTyping(entry.code);
+      emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
+    }, 600);
   }
 }
 
