@@ -24,6 +24,7 @@ const DEFAULT_SETTINGS = {
   behavior: {
     autoDisplay: true,      // 收到验证码自动展示（悬浮提示 + 列表）
     autoCopy: false,
+    autoCopyRestoreEnabled: true,   // 是否自动恢复原剪贴板
     autoCopyRestoreSeconds: 60,  // 自动复制后 N 秒恢复原剪贴板（0=不恢复）        // 收到验证码自动复制到剪贴板
     autoIsland: false,      // 收到验证码自动推送到 WinIsland
     playSound: true,        // 收到验证码播放提示音
@@ -136,7 +137,15 @@ function copyText(text) {
  * 多条验证码连续到达时：保留第一次的原剪贴板，并重置计时器。
  */
 function autoCopyWithRestore(code) {
+  const enabled = !!settings.behavior.autoCopyRestoreEnabled;
   const secs = Math.max(0, Number(settings.behavior.autoCopyRestoreSeconds) || 60);
+  // 关闭恢复：取消正在计时的恢复任务
+  if (!enabled) {
+    if (clipboardRestoreTimer) { clearTimeout(clipboardRestoreTimer); clipboardRestoreTimer = null; }
+    clipboardRestoreValue = null;
+    copyText(code);
+    return;
+  }
   // 首次复制前保存当前剪贴板（后续验证码不覆盖原值）
   if (clipboardRestoreTimer == null) {
     clipboardRestoreValue = clipboard.readText();
@@ -155,7 +164,6 @@ function autoCopyWithRestore(code) {
     }, secs * 1000);
   }
 }
-
 // ---------------------------------------------------------------- WinIsland 上岛
 function islandHeaders() {
   const h = { 'Content-Type': 'application/json' };

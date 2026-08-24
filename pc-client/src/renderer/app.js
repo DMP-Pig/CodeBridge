@@ -211,6 +211,8 @@ function fillSettingsForm() {
   $('#setAutoDisplay').checked = !!s.behavior?.autoDisplay;
   $('#setAutoCopy').checked = !!s.behavior?.autoCopy;
   $('#setCopyRestore').value = s.behavior?.autoCopyRestoreSeconds ?? 60;
+  $('#setCopyRestoreEnabled').checked = !!s.behavior?.autoCopyRestoreEnabled;
+  syncRestoreSecsEnabled();
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
@@ -220,6 +222,13 @@ function fillSettingsForm() {
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
 }
+
+function syncRestoreSecsEnabled() {
+  const on = $('#setCopyRestoreEnabled').checked;
+  $('#setCopyRestore').disabled = !on;
+  if (!on) $('#setCopyRestore').value = $('#setCopyRestore').value || 60;
+}
+$('#setCopyRestoreEnabled').addEventListener('change', syncRestoreSecsEnabled);
 
 async function saveSettings() {
   const patch = {
@@ -231,6 +240,7 @@ async function saveSettings() {
     behavior: {
       autoDisplay: $('#setAutoDisplay').checked,
       autoCopy: $('#setAutoCopy').checked,
+      autoCopyRestoreEnabled: $('#setCopyRestoreEnabled').checked,
       autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
       playSound: $('#setSound').checked,

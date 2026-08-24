@@ -153,16 +153,20 @@
           </div>
           <label class="switch"><input type="checkbox" id="setAutoCopy" /><span class="track"></span></label>
         </div>
-        <div class="set-row">
+                <div class="set-row">
           <div class="set-info">
-            <div class="set-name">自动复制后恢复剪贴板</div>
-            <div class="set-desc">复制验证码 N 秒后自动恢复为原剪贴板内容（0=不恢复）</div>
+            <div class="set-name">复制后恢复原剪贴板</div>
+            <div class="set-desc">复制验证码后，过一段时间自动恢复为之前的剪贴板内容</div>
           </div>
-          <input class="field num" id="setCopyRestore" type="number" min="0" max="3600" />
+          <label class="switch"><input type="checkbox" id="setCopyRestoreEnabled" /><span class="track"></span></label>
         </div>
         <div class="set-row">
           <div class="set-info">
-            <div class="set-name">自动上岛</div>
+            <div class="set-name">恢复时间（秒）</div>
+            <div class="set-desc">复制验证码 N 秒后恢复原剪贴板</div>
+          </div>
+          <input class="field num" id="setCopyRestore" type="number" min="1" max="3600" />
+        </div>
             <div class="set-desc">收到后自动推送到 WinIsland 灵动岛</div>
           </div>
           <label class="switch"><input type="checkbox" id="setAutoIsland" /><span class="track"></span></label>
