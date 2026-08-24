@@ -309,7 +309,11 @@ function buildIslandPayload(entry) {
     duration_seconds: Number(settings.island.durationSeconds) || 30,
     id: `phonetopc-${entry.id}`,
     buttons: [
-      { label: '复制', action: 'launch', value: `${process.execPath} --copy-last` },
+      {
+        label: settings.island.clickAction === 'type' ? '输入' : '复制',
+        action: 'launch',
+        value: `${process.execPath} ${settings.island.clickAction === 'type' ? '--type-last' : '--copy-last'}`,
+      },
     ],
   };
 }
@@ -956,8 +960,8 @@ function registerIpc() {
 }
 
 // ---------------------------------------------------------------- 生命周期
-// 单实例：再次运行 exe 时恢复主窗口（--copy-last 副本模式除外）
-if (!process.argv.includes('--copy-last')) {
+// 单实例：再次运行 exe 时恢复主窗口（--copy-last / --type-last 副本模式除外）
+if (!process.argv.includes('--copy-last') && !process.argv.includes('--type-last')) {
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     app.quit();
@@ -974,8 +978,15 @@ if (!process.argv.includes('--copy-last')) {
   }
 }
 
+// 被 WinIsland 灵动岛按钮启动：把最后一条验证码输入到当前聚焦输入框后退出
+if (process.argv.includes('--type-last')) {
+  app.whenReady().then(() => {
+    loadHistory();
+    if (codeHistory[0]) simulateTyping(codeHistory[0].code);
+    app.exit(0);
+  });
+} else if (process.argv.includes('--copy-last')) {
 // 被 WinIsland 灵动岛按钮启动：把最后一条验证码复制到剪贴板后退出
-if (process.argv.includes('--copy-last')) {
   app.whenReady().then(() => {
     loadHistory();
     if (codeHistory[0]) copyText(codeHistory[0].code);

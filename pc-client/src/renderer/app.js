@@ -35,6 +35,7 @@ const els = {
   setIslandTitleStyle: $('#setIslandTitleStyle'),
   setIslandShowApp: $('#setIslandShowApp'),
   setIslandAnimation: $('#setIslandAnimation'),
+  setIslandClickAction: $('#setIslandClickAction'),
   islandIconPresets: $('#islandIconPresets'),
   islandPreview: $('#islandPreview'),
   ipIcon: $('#ipIcon'),
@@ -172,7 +173,9 @@ const I18N = {
     'set.islandPreviewBody': '验证码 · 来自 短信',
     'btn.playPreview': '播放动画',
     'set.islandAnimation': '上岛动画', 'set.islandAnimationDesc': '选择上岛进入动画：默认 / 淡入 / 滑动 / 缩放',
-    'anim.default': '默认（弹性缩放）', 'anim.fade': '淡入', 'anim.slide': '底部滑入', 'anim.scale': '轻微缩放',
+    'anim.default': '默认（弹性缩放）', 'anim.fade': '淡入',     'set.islandClickAction': '上岛点击行为', 'set.islandClickActionDesc': '点击灵动岛按钮后：复制验证码到剪贴板，或自动输入到当前输入框',
+    'click.copy': '复制到剪贴板', 'click.type': '输入到当前输入框',
+'anim.slide': '底部滑入', 'anim.scale': '轻微缩放',
     'set.checkUpdate': '检查更新', 'set.checkUpdateDesc': '检查 GitHub 上是否有新版本',
     'set.theme': '主题', 'set.themeDesc': '深色/浅色显示模式', 'theme.dark': '深色', 'theme.light': '浅色',
     'set.language': '语言', 'set.languageDesc': '界面语言', 'lang.zh': '中文', 'lang.en': 'English',
@@ -249,6 +252,8 @@ const I18N = {
     'btn.playPreview': 'Play animation',
     'set.islandAnimation': 'Island Animation', 'set.islandAnimationDesc': 'Choose island enter animation: default / fade / slide / scale',
     'anim.default': 'Default (spring)', 'anim.fade': 'Fade', 'anim.slide': 'Slide up', 'anim.scale': 'Scale',
+    'set.islandClickAction': 'Island Click Action', 'set.islandClickActionDesc': 'When the island button is clicked: copy the code, or type it into the focused input',
+    'click.copy': 'Copy to clipboard', 'click.type': 'Type into focused input',
     'set.checkUpdate': 'Check Update', 'set.checkUpdateDesc': 'Check GitHub for a newer version',
     'set.theme': 'Theme', 'set.themeDesc': 'Dark or light appearance', 'theme.dark': 'Dark', 'theme.light': 'Light',
     'set.language': 'Language', 'set.languageDesc': 'Interface language', 'lang.zh': 'Chinese', 'lang.en': 'English',
@@ -542,6 +547,7 @@ function fillSettingsForm() {
   $('#setIslandTitleStyle').value = s.island?.titleStyle || 'code';
   $('#setIslandShowApp').checked = s.island?.showAppInBody !== false;
   $('#setIslandAnimation').value = s.island?.animation || 'default';
+  $('#setIslandClickAction').value = s.island?.clickAction || 'copy';
 
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
@@ -610,6 +616,7 @@ async function saveSettings() {
       titleStyle: $('#setIslandTitleStyle').value || 'code',
       showAppInBody: $('#setIslandShowApp').checked,
       animation: $('#setIslandAnimation').value || 'default',
+      clickAction: $('#setIslandClickAction').value === 'type' ? 'type' : 'copy',
     },
     ui: {
       accent: $('#setAccent').value,
