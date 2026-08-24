@@ -40,3 +40,5 @@ pc-client/out/
 __pycache__/
 *.tmp
 
+
+# verify artifacts.verify/

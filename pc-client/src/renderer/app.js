@@ -14,6 +14,7 @@ const els = {
   heroApp: $('#heroApp'),
   heroSource: $('#heroSource'),
   heroTime: $('#heroTime'),
+  heroTtl: $('#heroTtl'),
   heroCode: $('#heroCode'),
   btnCopyHero: $('#btnCopyHero'),
   btnIslandHero: $('#btnIslandHero'),
@@ -23,6 +24,8 @@ const els = {
   statTotal: $('#statTotal'),
   statsApps: $('#statsApps'),
   historySearch: $('#historySearch'),
+  devicesRow: $('#devicesRow'),
+  devicesHint: $('#devicesHint'),
   btnClearHistory: $('#btnClearHistory'),
   drawer: $('#drawer'),
   drawerScrim: $('#drawerScrim'),
@@ -62,6 +65,8 @@ let currentId = null;
 let activeHeroId = null;
 let updateInfo = null;
 let searchQuery = '';
+let devicesCache = [];
+let windowFocused = true;
 
 /* ---------------- 时间格式化 ---------------- */
 function fmtTime(iso) {
@@ -160,6 +165,16 @@ const I18N = {
     'toast.codeReceived': '收到验证码：{code}', 'toast.copiedSync': '已自动复制到剪贴板',
     'toast.clipboardRestored': '剪贴板已恢复为原内容', 'toast.autoIslandOk': '已自动上岛',
     'error.noCode': '无可用验证码，请先接收一条',
+    'status.devices': '已连接设备',
+    'status.devicesEmpty': '暂无设备在线',
+    'status.deviceOnline': '在线',
+    'status.deviceOffline': '离线',
+    'hero.expired': '已过期',
+    'toast.expired': '验证码已过期，无法操作',
+    'set.codeTtl': '验证码有效期（秒）',
+    'set.codeTtlDesc': '超过有效期后置灰并禁止复制/上岛/自动输入',
+    'set.privacy': '隐私模式',
+    'set.privacyDesc': '验证码模糊显示，窗口失焦后自动隐藏',
   },
   en: {
     'btn.minimize': 'Minimize', 'btn.maximize': 'Maximize', 'btn.close': 'Close',
@@ -219,6 +234,16 @@ const I18N = {
     'toast.codeReceived': 'Code received: {code}', 'toast.copiedSync': 'Auto-copied to clipboard',
     'toast.clipboardRestored': 'Clipboard restored', 'toast.autoIslandOk': 'Auto-pushed to island',
     'error.noCode': 'No code yet, receive one first',
+    'status.devices': 'Connected devices',
+    'status.devicesEmpty': 'No devices online',
+    'status.deviceOnline': 'online',
+    'status.deviceOffline': 'offline',
+    'hero.expired': 'Expired',
+    'toast.expired': 'Code expired, action disabled',
+    'set.codeTtl': 'Code TTL (s)',
+    'set.codeTtlDesc': 'After expiry, codes turn gray and copy/island/auto-type are disabled',
+    'set.privacy': 'Privacy Mode',
+    'set.privacyDesc': 'Blur codes and auto-hide when window loses focus',
   },
 };
 let lang = 'zh';
@@ -245,6 +270,72 @@ function applyI18n() {
   if (typeof updateIslandPreview === 'function') updateIslandPreview();
 }
 
+
+/* ---------------- 验证码有效期 / 设备在线状态 / 隐私模式 ---------------- */
+function isExpired(entry) {
+  return !!(entry && entry.expiresAt && Date.now() > entry.expiresAt);
+}
+function ttlText(entry) {
+  if (!entry || !entry.expiresAt) return '';
+  const remain = Math.max(0, Math.ceil((entry.expiresAt - Date.now()) / 1000));
+  if (remain <= 0) return t('hero.expired');
+  const m = Math.floor(remain / 60);
+  return '⏳ ' + m + ':' + String(remain % 60).padStart(2, '0');
+}
+function renderDevices(list) {
+  devicesCache = list || [];
+  const row = els.devicesRow;
+  const hint = els.devicesHint;
+  if (!row || !hint) return;
+  row.innerHTML = '';
+  if (devicesCache.length === 0) {
+    hint.textContent = t('status.devicesEmpty');
+    row.innerHTML = '<span class="device-chip offline">' + t('status.devicesEmpty') + '</span>';
+    return;
+  }
+  const online = devicesCache.filter((d) => d.online).length;
+  hint.textContent = online + '/' + devicesCache.length + ' ' + t('status.deviceOnline');
+  for (const d of devicesCache) {
+    const chip = document.createElement('span');
+    chip.className = 'device-chip ' + (d.online ? 'online' : 'offline');
+    const extra = [d.platform, d.hostname, d.from].filter(Boolean).join(' · ');
+    chip.title = (d.name || d.id) + (extra ? ' · ' + extra : '') + ' · ' + new Date(d.lastSeen).toLocaleTimeString();
+    chip.innerHTML = '<span class="device-dot"></span><span>' + escapeHtml(d.name || d.id || '?') + '</span>';
+    row.appendChild(chip);
+  }
+}
+function applyPrivacy() {
+  const on = !!(settings.ui && settings.ui.privacyMode);
+  document.body.classList.toggle('privacy-on', on);
+  document.body.classList.toggle('privacy-hidden', on && !windowFocused);
+}
+function updateTtlTimers() {
+  if (activeHeroId) {
+    const cur = codes.find((c) => c.id === activeHeroId);
+    if (cur) {
+      const expired = isExpired(cur);
+      els.heroTtl.textContent = ttlText(cur);
+      els.heroTtl.classList.toggle('expired', expired);
+      els.heroCode.classList.toggle('expired', expired);
+      els.heroContent.classList.toggle('expired-card', expired);
+      els.btnCopyHero.disabled = expired;
+      els.btnIslandHero.disabled = expired;
+    }
+  }
+  els.historyList.querySelectorAll('.history-card[data-id]').forEach((card) => {
+    const entry = codes.find((c) => c.id === card.dataset.id);
+    if (!entry) return;
+    const expired = isExpired(entry);
+    const ttlEl = card.querySelector('.history-ttl');
+    if (ttlEl) { ttlEl.textContent = ttlText(entry); ttlEl.classList.toggle('expired', expired); }
+    card.classList.toggle('expired-card', expired);
+    const codeEl = card.querySelector('.history-code');
+    if (codeEl) codeEl.classList.toggle('expired', expired);
+    card.querySelectorAll('[data-act]').forEach((btn) => {
+      if (btn.dataset.act !== 'remove') btn.disabled = expired;
+    });
+  });
+}
 
 /* ---------------- 状态卡片 ---------------- */
 function renderStatus(status) {
@@ -295,6 +386,13 @@ function showHero(entry) {
   els.heroApp.textContent = entry.app || t('history.msg.defaultApp');
   els.heroSource.textContent = entry.source || '';
   els.heroTime.textContent = fmtTime(entry.time);
+  const expired = isExpired(entry);
+  els.heroTtl.textContent = ttlText(entry);
+  els.heroTtl.classList.toggle('expired', expired);
+  els.heroCode.classList.toggle('expired', expired);
+  els.heroContent.classList.toggle('expired-card', expired);
+  els.btnCopyHero.disabled = expired;
+  els.btnIslandHero.disabled = expired;
   // 逐位动画
   const code = entry.code;
   els.heroCode.innerHTML = '';
@@ -311,6 +409,9 @@ function showEmpty() {
   activeHeroId = null;
   els.heroEmpty.classList.remove('hidden');
   els.heroContent.classList.add('hidden');
+  els.heroTtl.textContent = '';
+  els.btnCopyHero.disabled = false;
+  els.btnIslandHero.disabled = false;
 }
 
 /* ---------------- 统计面板 ---------------- */
@@ -368,14 +469,17 @@ function renderHistory() {
   }
   els.historyList.innerHTML = '';
   for (const entry of shown) {
+    const expired = isExpired(entry);
     const card = document.createElement('div');
-    card.className = 'history-card';
+    card.className = 'history-card' + (expired ? ' expired-card' : '');
+    card.dataset.id = entry.id;
     card.style.animationDelay = `${Math.min(shown.indexOf(entry) * 40, 300)}ms`;
     card.innerHTML = `
-      <div class="history-code">${escapeHtml(entry.code)}</div>
+      <div class="history-code${expired ? ' expired' : ''}">${escapeHtml(entry.code)}</div>
       <div class="history-info">
         <div class="history-app">${escapeHtml(entry.app || t('history.msg.defaultApp'))}</div>
         <div class="history-meta">${escapeHtml(entry.source || '')} · ${fmtFull(entry.time)}${entry.from ? ' · ' + escapeHtml(entry.from) : ''}</div>
+        <div class="history-ttl${expired ? ' expired' : ''}">${ttlText(entry)}</div>
       </div>
       <div class="history-actions">
         <button class="mini-btn" data-act="copy" data-id="${entry.id}" title="${t('history.actions.copy')}">
@@ -390,6 +494,7 @@ function renderHistory() {
       </div>
     `;
     card.querySelectorAll('[data-act]').forEach((btn) => {
+      if (expired && btn.dataset.act !== 'remove') btn.disabled = true;
       btn.addEventListener('click', () => handleAction(btn.dataset.act, btn.dataset.id));
     });
     els.historyList.appendChild(card);
@@ -397,6 +502,11 @@ function renderHistory() {
 }
 
 async function handleAction(act, id) {
+  const entry = codes.find((c) => c.id === id);
+  if (entry && isExpired(entry) && act !== 'remove') {
+    toast('err', t('toast.expired'));
+    return;
+  }
   if (act === 'copy') {
     const ok = await api.copyCode(id);
     if (ok) toast('copy', t('toast.copied'));
@@ -450,6 +560,7 @@ function fillSettingsForm() {
   $('#setAutoInput').checked = !!s.behavior?.autoInput;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
+  $('#setCodeTtl').value = s.behavior?.codeTtlSeconds ?? 600;
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
   $('#setIslandToken').value = s.island?.token || '';
   $('#setIslandDuration').value = s.island?.durationSeconds ?? 30;
@@ -462,6 +573,8 @@ function fillSettingsForm() {
   $('#setAutoClean').value = s.ui?.autoCleanDays ?? 7;
   $('#setTheme').value = s.ui?.theme || 'dark';
   $('#setLanguage').value = s.ui?.language || 'zh';
+  $('#setPrivacy').checked = !!s.ui?.privacyMode;
+  applyPrivacy();
   updateIslandPreview();
 }
 
@@ -501,6 +614,7 @@ async function saveSettings() {
       autoInput: $('#setAutoInput').checked,
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,
+      codeTtlSeconds: clamp(parseInt($('#setCodeTtl').value, 10), 30, 86400),
     },
     island: {
       baseUrl: $('#setIslandUrl').value.trim(),
@@ -516,12 +630,14 @@ async function saveSettings() {
       autoCleanDays: clamp(parseInt($('#setAutoClean').value, 10), 0, 365),
       theme: $('#setTheme').value === 'light' ? 'light' : 'dark',
       language: $('#setLanguage').value === 'en' ? 'en' : 'zh',
+      privacyMode: $('#setPrivacy').checked,
     },
   };
   settings = await api.setSettings(patch);
   lang = (settings.ui && settings.ui.language) || 'zh';
   document.documentElement.style.setProperty('--accent', settings.ui.accent);
   applyTheme();
+  applyPrivacy();
   applyI18n();
   if (activeHeroId) { const cur = codes.find((c) => c.id === activeHeroId); if (cur) showHero(cur); }
   renderHistory();
@@ -568,6 +684,11 @@ els.btnSettings.addEventListener('click', openDrawer);
 els.drawerClose.addEventListener('click', closeDrawer);
 els.drawerScrim.addEventListener('click', closeDrawer);
 els.btnSaveSettings.addEventListener('click', saveSettings);
+$('#setPrivacy').addEventListener('change', () => {
+  settings.ui = settings.ui || {};
+  settings.ui.privacyMode = $('#setPrivacy').checked;
+  applyPrivacy();
+});
 els.btnTestIsland.addEventListener('click', async () => {
   els.btnTestIsland.textContent = t('btn.testingIsland');
   els.btnTestIsland.disabled = true;
@@ -639,6 +760,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') closeDrawer();
 });
 
+/* 隐私模式：窗口失焦自动隐藏 */
+window.addEventListener('blur', () => { windowFocused = false; applyPrivacy(); });
+window.addEventListener('focus', () => { windowFocused = true; applyPrivacy(); });
+
+/* 验证码有效期倒计时（每秒刷新） */
+setInterval(updateTtlTimers, 1000);
+
 /* ---------------- 主进程事件 ---------------- */
 api.on('code:new', (entry) => {
   codes.unshift(entry);
@@ -650,6 +778,8 @@ api.on('code:new', (entry) => {
 });
 
 api.on('server:status', (status) => renderStatus(status));
+
+api.on('device:status', (list) => renderDevices(list));
 
 api.on('action:notice', (notice) => {
   const kindMap = { copy: 'copy', island: 'island', error: 'err', input: 'ok' };
@@ -673,6 +803,9 @@ api.on('action:notice', (notice) => {
   renderHistory();
   const status = await api.getServerStatus();
   renderStatus(status);
+  const devices = await api.listDevices().catch(() => []);
+  renderDevices(devices);
+  applyPrivacy();
 })();
 
 

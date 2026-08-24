@@ -15,8 +15,8 @@ android {
         applicationId = "com.phonetopc.copycode"
         minSdk = 26
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.0.2beta1"
+        versionCode = 6
+        versionName = "1.0.2beta2"
     }
 
     signingConfigs {

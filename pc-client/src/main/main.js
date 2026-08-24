@@ -3,7 +3,7 @@
  * 职责：局域网 HTTPS 服务（TLS 加密接收手机推送的验证码）、设置持久化、
  *       WinIsland 上岛推送、剪贴板、窗口/托盘管理。
  */
-const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell, Notification, screen, dialog } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
@@ -49,6 +49,14 @@ const DEFAULT_SETTINGS = {
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
     autoInput: false,       // 收到验证码自动输入到当前焦点输入框
+    codeTtlSeconds: 600,    // 验证码有效期（秒），过期后置灰且不上岛
+    webhookEnabled: false,  // 验证码到达时调用 Webhook
+    webhookUrl: '',         // Webhook URL（POST JSON）
+    commandPath: '',        // 自定义命令/脚本路径
+    commandArgs: '{code}',  // 命令参数模板，支持 {code} {app} {source}
+    autoLaunch: false,      // 开机自启
+    clipboardSync: false,   // 发布剪贴板到手机（反向剪贴板）
+    speakCode: false,       // 收到验证码语音播报
   },
   island: {
     baseUrl: 'http://127.0.0.1:9840',
@@ -57,6 +65,9 @@ const DEFAULT_SETTINGS = {
     icon: '\\uE8D6',        // 钥匙图标（Segoe MDL2）
     titleStyle: 'code',     // 紧凑标题样式：'code' | 'cn' | 'en'
     showAppInBody: true,    // 展开正文是否包含来源应用
+    animation: 'slide',     // 上岛动画：default | fade | slide | scale
+    clickAction: 'copy',    // 上岛点击行为：copy | type
+    displayIndex: -1,       // 目标显示器索引（-1=自动/主屏）
   },
   ui: {
     accent: '#6ea8ff',
@@ -64,6 +75,7 @@ const DEFAULT_SETTINGS = {
     autoCleanDays: 7,       // 自动清理天数（0=关闭）
     theme: 'dark',          // 'dark' | 'light' 深浅色主题
     language: 'zh',         // 'zh' | 'en' 界面语言
+    privacyMode: false,     // 隐私模式：验证码模糊显示，失焦自动隐藏
   },
 };
 
@@ -90,6 +102,7 @@ function loadDeviceId() {
 loadDeviceId();
 
 let codeHistory = [];       // 最新在前
+const devices = new Map();   // 设备在线状态：deviceId -> 最近心跳信息
 let server = null;
 let mainWindow = null;
 let tray = null;
@@ -170,6 +183,11 @@ function getLanIps() {
 // ---------------------------------------------------------------- 历史记录
 function addHistory(entry) {
   autoCleanHistory();
+  // 验证码有效期倒计时（可配置）
+  if (!entry.expiresAt) {
+    const ttl = Math.max(30, Number(settings.behavior.codeTtlSeconds) || 600) * 1000;
+    entry.expiresAt = Date.now() + ttl;
+  }
   codeHistory.unshift(entry);
   const max = Math.max(10, settings.ui.keepHistory || 50);
   if (codeHistory.length > max) codeHistory.length = max;
@@ -301,6 +319,9 @@ function estimateIslandNeed(entry) {
 }
 function pushToIsland(entry) {
   return new Promise((resolve, reject) => {
+    if (entry && entry.expiresAt && Date.now() > entry.expiresAt) {
+      return reject(new Error(mainT('验证码已过期', 'Code expired')));
+    }
     const base = (settings.island.baseUrl || 'http://127.0.0.1:9840').replace(/\/+$/, '');
     // 单行 + 不影响灵动岛宽度：
     //   - 验证码放进短标题，紧凑单行直接可见；
@@ -392,10 +413,24 @@ async function handleRequest(req, res) {
       from: req.socket.remoteAddress || '',
       time: new Date().toISOString(),
     };
+    recordDevice(body, req);
     addHistory(entry);
     emitToRenderer('code:new', entry);
     handleAutoActions(entry);
     return sendJson(res, 200, { ok: true, id: entry.id });
+  }
+
+  // 心跳：手机端定期上报，用于 PC 显示在线状态 / 断线感知
+  if (req.method === 'POST' && pathname === '/api/heartbeat') {
+    let body;
+    try { body = await readJsonBody(req); } catch (err) {
+      return sendJson(res, 400, { ok: false, error: err.message });
+    }
+    if (!checkToken(req, body)) {
+      return sendJson(res, 401, { ok: false, error: 'token 无效' });
+    }
+    recordDevice(body, req);
+    return sendJson(res, 200, { ok: true, now: Date.now() });
   }
 
   sendJson(res, 404, { ok: false, error: 'not found' });
@@ -407,6 +442,43 @@ async function handleRequest(req, res) {
  * macOS:   osascript System Events keystroke（需辅助功能权限）
  * Linux:   xdotool type（需已安装 xdotool）
  */
+// ---------------------------------------------------------------- 设备在线状态（心跳）
+function recordDevice(body, req) {
+  try {
+    const id = String(body.deviceId || body.id || '').slice(0, 64);
+    if (!id) return;
+    devices.set(id, {
+      id,
+      name: String(body.name || '').slice(0, 40),
+      app: String(body.app || '').slice(0, 40),
+      platform: String(body.platform || 'android').slice(0, 12),
+      hostname: String(body.hostname || '').slice(0, 40),
+      from: req.socket.remoteAddress || '',
+      lastSeen: Date.now(),
+    });
+  } catch (e) { /* ignore */ }
+}
+function devicesToArray() {
+  const now = Date.now();
+  const arr = [];
+  for (const d of devices.values()) {
+    const online = now - d.lastSeen < 70000;
+    arr.push({ ...d, online, lastSeen: d.lastSeen });
+  }
+  return arr;
+}
+function broadcastDevices() {
+  emitToRenderer('device:status', devicesToArray());
+}
+// 定时清理离线设备并刷新在线状态
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, d] of devices) {
+    if (now - d.lastSeen > 300000) devices.delete(id);
+  }
+  broadcastDevices();
+}, 30000);
+
 function escapeSendKeys(s) {
   const special = ['+', '^', '%', '~', '(', ')', '[', ']', '<', '>'];
   let out = '';
@@ -664,6 +736,8 @@ function registerIpc() {
   }));
 
   ipcMain.handle('code:list', () => codeHistory);
+
+  ipcMain.handle('devices:list', () => devicesToArray());
 
   ipcMain.handle('code:clear', () => { codeHistory = []; saveHistory(); return true; });
 

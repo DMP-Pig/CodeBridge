@@ -67,6 +67,13 @@
           </div>
         </div>
         <div class="ips-row" id="ipsRow"></div>
+<div class="devices-wrap" id="devicesWrap">
+          <div class="devices-head">
+            <span class="devices-title" data-i18n="status.devices">已连接设备</span>
+            <span class="devices-hint" id="devicesHint"></span>
+          </div>
+          <div class="devices-row" id="devicesRow"></div>
+        </div>
       </div>
 
       <!-- 最新验证码大卡 -->
@@ -85,6 +92,7 @@
             <span class="hero-app" id="heroApp" data-i18n="history.msg.defaultApp">短信</span>
             <span class="hero-source" id="heroSource"></span>
             <span class="hero-time" id="heroTime"></span>
+            <span class="hero-ttl" id="heroTtl"></span>
           </div>
           <div class="hero-code" id="heroCode">000000</div>
           <div class="hero-actions">
@@ -231,6 +239,12 @@
             <div class="set-desc" data-i18n="set.systemNotifyDesc">收到验证码时发送 Windows/macOS 系统通知</div>
           </div>
           <label class="switch"><input type="checkbox" id="setSystemNotify" /><span class="track"></span></label>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.codeTtl">验证码有效期（秒）</div>
+            <div class="set-desc" data-i18n="set.codeTtlDesc">超过有效期后置灰并禁止复制/上岛/自动输入</div>
+          </div>
+          <input class="field num" id="setCodeTtl" type="number" min="30" max="86400" />
         </div>
       </section>
 
@@ -366,6 +380,13 @@
             <div class="set-desc" data-i18n="set.autoCleanDesc">自动删除超过 N 天的历史记录（0=关闭）</div>
           </div>
           <input class="field num" id="setAutoClean" type="number" min="0" max="365" />
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.privacy">隐私模式</div>
+            <div class="set-desc" data-i18n="set.privacyDesc">验证码模糊显示，窗口失焦后自动隐藏</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setPrivacy" /><span class="track"></span></label>
         </div>
       </section>
     </div>

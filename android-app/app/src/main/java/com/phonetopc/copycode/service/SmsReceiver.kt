@@ -18,6 +18,7 @@ class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
         Tls.init(context)
+        CodeSender.init(context)
         val settings = Settings.get()
         if (!settings.autoSend || !settings.isValid()) return
 

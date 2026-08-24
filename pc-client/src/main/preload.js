@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('p2p', {
   restartServer: () => ipcRenderer.invoke('server:restart'),
   getServerStatus: () => ipcRenderer.invoke('server:status'),
   listCodes: () => ipcRenderer.invoke('code:list'),
+  listDevices: () => ipcRenderer.invoke('devices:list'),
   clearCodes: () => ipcRenderer.invoke('code:clear'),
   copyCode: (id) => ipcRenderer.invoke('code:copy', id),
   writeClipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
@@ -22,7 +23,7 @@ contextBridge.exposeInMainWorld('p2p', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   getPairingQr: () => ipcRenderer.invoke('pairing:qr'),
   on: (channel, cb) => {
-    const allowed = ['code:new', 'server:status', 'action:notice', 'update:result'];
+    const allowed = ['code:new', 'server:status', 'action:notice', 'update:result', 'device:status'];
     if (allowed.includes(channel)) {
       const listener = (_e, payload) => cb(payload);
       ipcRenderer.on(channel, listener);
