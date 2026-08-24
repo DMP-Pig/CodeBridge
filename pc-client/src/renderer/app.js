@@ -22,6 +22,7 @@ const els = {
   statToday: $('#statToday'),
   statTotal: $('#statTotal'),
   statsApps: $('#statsApps'),
+  statsTrend: $('#statsTrend'),
   historySearch: $('#historySearch'),
   devicesRow: $('#devicesRow'),
   devicesHint: $('#devicesHint'),
@@ -139,7 +140,7 @@ const I18N = {
     'history.exportCsv': '导出 CSV', 'history.exportJson': '导出 JSON', 'history.import': '导入',
     'toast.exportOk': '已导出历史记录', 'toast.exportErr': '导出失败或已取消',
     'toast.importOk': '导入完成：新增 {a} 条 / 跳过 {s} 条', 'toast.importErr': '导入失败',
-    'stats.title': '验证码统计', 'stats.today': '今日', 'stats.total': '累计', 'stats.dist': '今日来源分布', 'stats.empty': '今日暂无数据',
+    'stats.title': '验证码统计', 'stats.trend': '近 7 天趋势', 'stats.today': '今日', 'stats.total': '累计', 'stats.dist': '今日来源分布', 'stats.empty': '今日暂无数据',
     'history.empty': '暂无历史记录',
     'history.searchPh': '搜索验证码 / 应用 / 来源…', 'history.searchEmpty': '无匹配结果',
     'history.actions.copy': '复制到剪贴板', 'history.actions.island': '推送到 WinIsland 灵动岛', 'history.actions.remove': '移除',
@@ -222,7 +223,7 @@ const I18N = {
     'history.exportCsv': 'Export CSV', 'history.exportJson': 'Export JSON', 'history.import': 'Import',
     'toast.exportOk': 'History exported', 'toast.exportErr': 'Export failed or canceled',
     'toast.importOk': 'Import done: {a} added / {s} skipped', 'toast.importErr': 'Import failed',
-    'stats.title': 'Statistics', 'stats.today': 'Today', 'stats.total': 'Total', 'stats.dist': "Today's sources", 'stats.empty': 'No data today',
+    'stats.title': 'Statistics', 'stats.trend': '7-day trend', 'stats.today': 'Today', 'stats.total': 'Total', 'stats.dist': "Today's sources", 'stats.empty': 'No data today',
     'history.empty': 'No history yet',
     'history.searchPh': 'Search code / app / source…', 'history.searchEmpty': 'No matches',
     'history.actions.copy': 'Copy to clipboard', 'history.actions.island': 'Push to WinIsland', 'history.actions.remove': 'Remove',
@@ -421,6 +422,33 @@ function renderStats() {
   }
   els.statToday.textContent = String(today);
   els.statTotal.textContent = String(codes.length);
+  // 近 7 天趋势（柱状图）
+  const nowDt = new Date();
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(nowDt.getFullYear(), nowDt.getMonth(), nowDt.getDate() - i);
+    days.push({ date: d, key: d.toDateString(), count: 0 });
+  }
+  const dayMap = new Map(days.map((x) => [x.key, x]));
+  for (const c of codes) {
+    const dd = new Date(c.time);
+    if (!Number.isNaN(dd.getTime()) && dayMap.has(dd.toDateString())) dayMap.get(dd.toDateString()).count++;
+  }
+  const maxDay = Math.max(1, ...days.map((x) => x.count));
+  els.statsTrend.innerHTML = '';
+  const todayKeyStr = nowDt.toDateString();
+  for (const day of days) {
+    const col = document.createElement('div');
+    col.className = 'trend-col' + (day.key === todayKeyStr ? ' today' : '');
+    const pct = day.count ? Math.max(6, Math.round((day.count / maxDay) * 100)) : 2;
+    const md = (day.date.getMonth() + 1) + '/' + day.date.getDate();
+    col.title = md + ' · ' + day.count;
+    col.innerHTML = '<div class="trend-count">' + (day.count || '') + '</div>' +
+      '<div class="trend-bar-wrap"><div class="trend-bar" style="height:' + pct + '%"></div></div>' +
+      '<div class="trend-label">' + md + '</div>';
+    els.statsTrend.appendChild(col);
+  }
+
   const top = [...appCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (top.length === 0) {
     els.statsApps.innerHTML = '<div class="stats-empty">' + t('stats.empty') + '</div>';
