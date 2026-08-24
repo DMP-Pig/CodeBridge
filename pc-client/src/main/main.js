@@ -49,12 +49,12 @@ const DEFAULT_SETTINGS = {
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
     autoInput: false,       // 收到验证码自动输入到当前焦点输入框
+    autoInputSelected: false, // 收到验证码后，若焦点在输入框上则自动输入
     webhookEnabled: false,  // 验证码到达时调用 Webhook
     webhookUrl: '',         // Webhook URL（POST JSON）
     commandPath: '',        // 自定义命令/脚本路径
     commandArgs: '{code}',  // 命令参数模板，支持 {code} {app} {source}
     autoLaunch: false,      // 开机自启
-    clipboardSync: false,   // 发布剪贴板到手机（反向剪贴板）
     clipboardHistoryEnabled: true,   // PC 剪贴板历史记录
     speakCode: false,       // 收到验证码语音播报
     filterMode: 'off',      // 来源过滤器：关闭 | 白名单 | 黑名单
@@ -215,9 +215,6 @@ function autoCleanHistory() {
   if (codeHistory.length !== before) saveHistory();
 }
 
-// 反向剪贴板：监听 PC 剪贴板，手机轮询 /api/clipboard 拉取
-let syncedClipboard = '';
-let clipboardSyncRev = Date.now();
 let clipboardWatchTimer = null;
 const clipboardHistoryMaxDefault = 100;
 let clipboardHistory = [];
@@ -250,16 +247,15 @@ function recordClipboardEntry(text, source) {
 function startClipboardWatch() {
   if (clipboardWatchTimer) { clearInterval(clipboardWatchTimer); clipboardWatchTimer = null; }
   const historyOn = settings.behavior.clipboardHistoryEnabled !== false;
-  if (!settings.behavior.clipboardSync && !historyOn) return;
-  try { syncedClipboard = clipboard.readText(); } catch { syncedClipboard = ''; }
-  clipboardSyncRev = Date.now();
+  if (!historyOn) return;
+  let lastText = '';
+  try { lastText = clipboard.readText(); } catch { lastText = ''; }
   clipboardWatchTimer = setInterval(() => {
     try {
       const t = clipboard.readText();
-      if (t !== syncedClipboard) {
-        syncedClipboard = t;
-        clipboardSyncRev = Date.now();
-        if (historyOn) recordClipboardEntry(t, 'manual');
+      if (t !== lastText) {
+        lastText = t;
+        recordClipboardEntry(t, 'manual');
       }
     } catch { /* 忽略剪贴板读取失败 */ }
   }, 1000);
@@ -542,20 +538,6 @@ async function handleRequest(req, res) {
     return sendJson(res, 200, { ok: true, now: Date.now() });
   }
 
-  // 反向剪贴板：手机轮询 PC 剪贴板，rev 变化时返回新内容
-  if (req.method === 'GET' && pathname === '/api/clipboard') {
-    if (!checkToken(req, {})) {
-      return sendJson(res, 401, { ok: false, error: 'token 无效' });
-    }
-    const rev = parseInt(url.searchParams.get('rev') || '0', 10) || 0;
-    const changed = clipboardSyncRev !== rev;
-    return sendJson(res, 200, {
-      ok: true,
-      rev: clipboardSyncRev,
-      text: changed ? syncedClipboard : '',
-    });
-  }
-
   sendJson(res, 404, { ok: false, error: 'not found' });
 }
 
@@ -642,6 +624,63 @@ function simulateTyping(text) {
   }
 }
 
+/**
+ * 检测当前是否有「选中的输入框」：焦点是否在可编辑文本框上（跨平台）。
+ * Windows: PowerShell UI Automation 检测焦点元素是否为 Edit/Document
+ * macOS:   osascript System Events 检测 AXFocusedUIElement 角色
+ * Linux:   xdotool 可用时视为可输入（无法可靠判断焦点元素类型）
+ * 回调参数为 true 表示当前焦点在输入框上。
+ */
+function hasSelectedInput(cb) {
+  const done = typeof cb === 'function' ? cb : () => {};
+  if (process.platform === 'win32') {
+    const psFile = path.join(os.tmpdir(), `cb_focus_${Date.now()}_${Math.floor(Math.random() * 1e6)}.ps1`);
+    const script = [
+      '$ErrorActionPreference = "SilentlyContinue"',
+      'Add-Type -AssemblyName UIAutomationClient',
+      'Add-Type -AssemblyName UIAutomationTypes',
+      'try {',
+      '  $f = [System.Windows.Automation.AutomationElement]::FocusedElement',
+      '  if ($null -eq $f) { Write-Output "NO"; exit }',
+      '  $ct = $f.Current.ControlType.ProgrammaticName',
+      '  if ($ct -match "Edit|Document") { Write-Output "YES" } else { Write-Output "NO" }',
+      '} catch { Write-Output "NO" }',
+    ].join('\n');
+    try {
+      fs.writeFileSync(psFile, '\ufeff' + script, 'utf16le');
+      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', psFile], { timeout: 10000 }, (err, stdout) => {
+        try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
+        done(!err && /YES/.test(String(stdout || '')));
+      });
+    } catch (err) {
+      try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
+      done(false);
+    }
+  } else if (process.platform === 'darwin') {
+    const script = [
+      'set role to ""',
+      'try',
+      '  tell application "System Events"',
+      '    set frontProc to first process whose frontmost is true',
+      '    set fe to value of attribute "AXFocusedUIElement" of frontProc',
+      '    set role to role of fe',
+      '  end tell',
+      'end try',
+      'return (role is "AXTextField" or role is "AXTextArea" or role is "AXComboBox" or role is "AXSearchField" or role is "AXDocument") as string',
+    ].join('\n');
+    execFile('osascript', ['-e', script], { timeout: 10000 }, (err, stdout) => {
+      done(!err && /true/i.test(String(stdout || '')));
+    });
+  } else if (process.platform === 'linux') {
+    // Linux 无法可靠检测焦点元素类型：若 xdotool 可用则视为有输入框
+    execFile('xdotool', ['--version'], { timeout: 5000 }, (err) => {
+      done(!err);
+    });
+  } else {
+    done(false);
+  }
+}
+
 function handleAutoActions(entry) {
   // 自动复制
   if (settings.behavior.autoCopy) {
@@ -659,6 +698,16 @@ function handleAutoActions(entry) {
     setTimeout(() => {
       simulateTyping(entry.code);
       emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
+    }, 600);
+  }
+  // 选中输入框自动输入：先检测焦点是否在可编辑输入框上，是才输入
+  if (settings.behavior.autoInputSelected) {
+    setTimeout(() => {
+      hasSelectedInput((ok) => {
+        if (!ok) return;
+        simulateTyping(entry.code);
+        emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
+      });
     }, 600);
   }
   // Webhook / 脚本触发

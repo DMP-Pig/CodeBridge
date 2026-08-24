@@ -101,7 +101,6 @@ fun MainScreen() {
     var batteryWhitelisted by remember { mutableStateOf(isIgnoringBatteryOptimizations(context)) }
     var floatBubble by remember { mutableStateOf(settings.floatBubble) }
     var bubbleSeconds by remember { mutableStateOf(settings.bubbleSeconds.toString()) }
-    var clipboardSync by remember { mutableStateOf(settings.clipboardSync) }
     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
     // 从系统设置页返回时刷新权限 / 保活状态
@@ -437,13 +436,6 @@ fun MainScreen() {
                         placeholder = "\\d{6}",
                     )
                 }
-                ToggleRow(
-                    title = "\u540c\u6b65 PC \u526a\u8d34\u677f",
-                    desc = "PC \u526a\u8d34\u677f\u53d8\u5316\u65f6\u81ea\u52a8\u540c\u6b65\u5230\u624b\u673a",
-                    checked = clipboardSync,
-                    onCheckedChange = { clipboardSync = it },
-                )
-
                 // 搜索结果：多台 PC 时弹出选择
                 foundHosts?.let { hosts ->
                     AlertDialog(
@@ -521,7 +513,6 @@ fun MainScreen() {
                         settings.customRegex = customRegex
                         settings.floatBubble = floatBubble
                         settings.bubbleSeconds = bubbleSeconds.toIntOrNull() ?: 15
-                        settings.clipboardSync = clipboardSync
                         configs = settings.pcConfigs()
                         activeIdx = settings.activeIndex()
                         statusMsg = if (settings.isValid()) "设置已保存" else "请填写 PC 地址"

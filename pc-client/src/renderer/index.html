@@ -244,6 +244,13 @@
         </div>
         <div class="set-row">
           <div class="set-info">
+            <div class="set-name" data-i18n="set.autoInputSelected">选中输入框自动输入</div>
+            <div class="set-desc" data-i18n="set.autoInputSelectedDesc">收到验证码后，若焦点在输入框上则自动输入</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setAutoInputSelected" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
             <div class="set-name" data-i18n="set.webhook">Webhook / 脚本触发</div>
             <div class="set-desc" data-i18n="set.webhookDesc">收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本</div>
           </div>
@@ -295,13 +302,6 @@
             <div class="set-desc" data-i18n="set.autoLaunchDesc">系统登录时自动启动 CodeBridge 并后台运行</div>
           </div>
           <label class="switch"><input type="checkbox" id="setAutoLaunch" /><span class="track"></span></label>
-        </div>
-        <div class="set-row">
-          <div class="set-info">
-            <div class="set-name" data-i18n="set.clipboardSync">同步剪贴板到手机</div>
-            <div class="set-desc" data-i18n="set.clipboardSyncDesc">PC 剪贴板变化时自动同步到手机端</div>
-          </div>
-          <label class="switch"><input type="checkbox" id="setClipboardSync" /><span class="track"></span></label>
         </div>
         <div class="set-row">
           <div class="set-info">

@@ -65,7 +65,7 @@ const els = {
   setSystemNotify: $('#setSystemNotify'),
   setWebhookEnabled: $('#setWebhookEnabled'),
   setAutoLaunch: $('#setAutoLaunch'),
-  setClipboardSync: $('#setClipboardSync'),
+  setAutoInputSelected: $('#setAutoInputSelected'),
   setFilterMode: $('#setFilterMode'),
   setFilterNumbers: $('#setFilterNumbers'),
   setWebhookUrl: $('#setWebhookUrl'),
@@ -160,10 +160,11 @@ const I18N = {
     'set.copyRestoreSecs': '恢复时间（秒）', 'set.copyRestoreSecsDesc': '复制验证码 N 秒后恢复原剪贴板',
     'set.autoIsland': '自动上岛', 'set.autoIslandDesc': '收到后自动推送到 WinIsland 灵动岛',
     'set.autoInput': '自动输入', 'set.autoInputDesc': '收到后自动输入到当前焦点所在的输入框',
+    'set.autoInputSelected': '选中输入框自动输入', 'set.autoInputSelectedDesc': '收到验证码后，若焦点在输入框上则自动输入',
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
         'set.autoLaunch': '开机自启', 'set.autoLaunchDesc': '系统登录时自动启动 CodeBridge 并后台运行',
-        'set.clipboardSync': '同步剪贴板到手机', 'set.clipboardSyncDesc': 'PC 剪贴板变化时自动同步到手机端', 'set.clipboardHistory': '剪贴板历史', 'set.clipboardHistoryDesc': '记录本机剪贴板变化，可一键回拷', 'set.clipboardHistoryMax': '保留条数', 'set.clipboardHistoryMaxDesc': '剪贴板历史最多保留的条数', 'clipboardHistory.title': '剪贴板历史', 'clipboardHistory.empty': '暂无剪贴板记录', 'clipboardHistory.auto': '自动复制', 'clipboardHistory.copied': '已复制到剪贴板', 'clipboardHistory.clear': '清空', 'clipboardHistory.del': '删除', 'clipboardHistory.open': '点击回拷',
+        'set.clipboardHistory': '剪贴板历史', 'set.clipboardHistoryDesc': '记录本机剪贴板变化，可一键回拷', 'set.clipboardHistoryMax': '保留条数', 'set.clipboardHistoryMaxDesc': '剪贴板历史最多保留的条数', 'clipboardHistory.title': '剪贴板历史', 'clipboardHistory.empty': '暂无剪贴板记录', 'clipboardHistory.auto': '自动复制', 'clipboardHistory.copied': '已复制到剪贴板', 'clipboardHistory.clear': '清空', 'clipboardHistory.del': '删除', 'clipboardHistory.open': '点击回拷',
         'set.filterMode': '来源过滤器', 'set.filterModeDesc': '按发件号码或来源应用允许/拦截验证码',
         'filter.off': '关闭', 'filter.whitelist': '仅允许列表中的来源', 'filter.blacklist': '拦截列表中的来源',
         'set.filterNumbers': '来源列表', 'set.filterNumbersDesc': '每行一个：号码前缀或应用名（如 10086、淘宝）',
@@ -243,10 +244,11 @@ const I18N = {
     'set.copyRestoreSecs': 'Restore After (s)', 'set.copyRestoreSecsDesc': 'Seconds before restoring original clipboard',
     'set.autoIsland': 'Auto Island', 'set.autoIslandDesc': 'Push to WinIsland automatically',
     'set.autoInput': 'Auto Type', 'set.autoInputDesc': 'Type the code into the currently focused input',
+    'set.autoInputSelected': 'Type into Selected Input', 'set.autoInputSelectedDesc': 'Auto-type the code when an input box is focused',
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
         'set.autoLaunch': 'Launch at Login', 'set.autoLaunchDesc': 'Start CodeBridge in the background at system login',
-        'set.clipboardSync': 'Sync Clipboard to Phone', 'set.clipboardSyncDesc': 'Auto-sync PC clipboard changes to the phone', 'set.clipboardHistory': 'Clipboard History', 'set.clipboardHistoryDesc': 'Record PC clipboard changes for one-click re-copy', 'set.clipboardHistoryMax': 'Max Entries', 'set.clipboardHistoryMaxDesc': 'Maximum clipboard history entries to keep', 'clipboardHistory.title': 'Clipboard History', 'clipboardHistory.empty': 'No clipboard entries', 'clipboardHistory.auto': 'Auto', 'clipboardHistory.copied': 'Copied to clipboard', 'clipboardHistory.clear': 'Clear', 'clipboardHistory.del': 'Delete', 'clipboardHistory.open': 'Click to re-copy',
+        'set.clipboardHistory': 'Clipboard History', 'set.clipboardHistoryDesc': 'Record PC clipboard changes for one-click re-copy', 'set.clipboardHistoryMax': 'Max Entries', 'set.clipboardHistoryMaxDesc': 'Maximum clipboard history entries to keep', 'clipboardHistory.title': 'Clipboard History', 'clipboardHistory.empty': 'No clipboard entries', 'clipboardHistory.auto': 'Auto', 'clipboardHistory.copied': 'Copied to clipboard', 'clipboardHistory.clear': 'Clear', 'clipboardHistory.del': 'Delete', 'clipboardHistory.open': 'Click to re-copy',
         'set.filterMode': 'Source Filter', 'set.filterModeDesc': 'Allow or block codes by sender number or source app',
         'filter.off': 'Off', 'filter.whitelist': 'Allow only listed sources', 'filter.blacklist': 'Block listed sources',
         'set.filterNumbers': 'Source List', 'set.filterNumbersDesc': 'One per line: number prefix or app name (e.g. 10086, Taobao)',
@@ -576,10 +578,10 @@ function fillSettingsForm() {
   syncRestoreSecsEnabled();
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
   $('#setAutoInput').checked = !!s.behavior?.autoInput;
+  $('#setAutoInputSelected').checked = !!s.behavior?.autoInputSelected;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setAutoLaunch').checked = !!s.behavior?.autoLaunch;
-  $('#setClipboardSync').checked = !!s.behavior?.clipboardSync;
   $('#setClipboardHistory').checked = s.behavior?.clipboardHistoryEnabled !== false;
   $('#setClipboardHistoryMax').value = s.ui?.clipboardHistoryMax ?? 100;
   $('#setFilterMode').value = s.behavior?.filterMode || 'off';
@@ -647,10 +649,10 @@ async function saveSettings() {
       autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
       autoInput: $('#setAutoInput').checked,
+      autoInputSelected: $('#setAutoInputSelected').checked,
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,
       autoLaunch: $('#setAutoLaunch').checked,
-      clipboardSync: $('#setClipboardSync').checked,
       clipboardHistoryEnabled: $('#setClipboardHistory').checked,
       filterMode: $('#setFilterMode').value || 'off',
       filterNumbers: $('#setFilterNumbers').value,
