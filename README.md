@@ -15,6 +15,11 @@ When your phone receives an SMS verification code, CodeBridge forwards it to you
 - One-click copy, auto-copy, and **auto-restore clipboard** after N seconds / 一键复制、自动复制、自动复制后 N 秒恢复原剪贴板
 - Push to WinIsland dynamic island (auto / manual), single-line compact display, does not widen the island / 推送到 WinIsland 灵动岛（自动/手动），单行紧凑显示，不影响灵动岛宽度
 - Fully configurable: PC host, port, token, auto-forward, auto-copy, auto-island, restore duration, icon, regex / 全部可配置：PC 地址、端口、Token、自动转发、自动复制、自动上岛、恢复时长、图标、正则
+- End-to-end TLS encryption (HTTPS + certificate pinning) / 验证码 HTTPS 加密传输（PC 自签证书 + 手机端证书固定，防局域网窃听）
+- Auto-type the code into a focused input after receiving / 收到验证码后自动输入到当前焦点输入框
+- Auto-search PC clients on LAN, multi-PC profiles, QR-code pairing / 自动搜索局域网 PC 客户端、多 PC 配置保存切换、二维码扫码配对
+- Background survival: Android foreground service / PC system tray / 后台保活：Android 前台服务、PC 最小化到系统托盘
+- Statistics panel, clipboard history, Web console, desktop widget / 统计面板、剪贴板历史、Web 控制台、手机桌面小组件
 - Desktop clients for Windows / macOS / Linux, mobile client as Android APK / PC 端支持 Windows / macOS / Linux，手机端为 Android APK
 
 ## Structure / 目录结构（PC 端与手机端代码分离）
@@ -68,8 +73,8 @@ PC 端「上岛」会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9
 
 ## Version / 版本
 
-Current version: `1.0.0` (official release). Beta builds stay local only; official releases are published to GitHub.
-当前版本：`1.0.0`（正式版）。Beta 版本仅本地保留，正式版上传 GitHub。
+Current version: `1.0.2` (official release). Beta builds stay local only; official releases are published to GitHub.
+当前版本：`1.0.2`（正式版）。Beta 版本仅本地保留，正式版上传 GitHub。
 
 ## License / 许可
 
