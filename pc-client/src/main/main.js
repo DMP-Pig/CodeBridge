@@ -49,7 +49,6 @@ const DEFAULT_SETTINGS = {
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
     autoInput: false,       // 收到验证码自动输入到当前焦点输入框
-    codeTtlSeconds: 600,    // 验证码有效期（秒），过期后置灰且不上岛
     webhookEnabled: false,  // 验证码到达时调用 Webhook
     webhookUrl: '',         // Webhook URL（POST JSON）
     commandPath: '',        // 自定义命令/脚本路径
@@ -75,7 +74,6 @@ const DEFAULT_SETTINGS = {
     autoCleanDays: 7,       // 自动清理天数（0=关闭）
     theme: 'dark',          // 'dark' | 'light' 深浅色主题
     language: 'zh',         // 'zh' | 'en' 界面语言
-    privacyMode: false,     // 隐私模式：验证码模糊显示，失焦自动隐藏
   },
 };
 
@@ -183,11 +181,6 @@ function getLanIps() {
 // ---------------------------------------------------------------- 历史记录
 function addHistory(entry) {
   autoCleanHistory();
-  // 验证码有效期倒计时（可配置）
-  if (!entry.expiresAt) {
-    const ttl = Math.max(30, Number(settings.behavior.codeTtlSeconds) || 600) * 1000;
-    entry.expiresAt = Date.now() + ttl;
-  }
   codeHistory.unshift(entry);
   const max = Math.max(10, settings.ui.keepHistory || 50);
   if (codeHistory.length > max) codeHistory.length = max;
@@ -319,9 +312,6 @@ function estimateIslandNeed(entry) {
 }
 function pushToIsland(entry) {
   return new Promise((resolve, reject) => {
-    if (entry && entry.expiresAt && Date.now() > entry.expiresAt) {
-      return reject(new Error(mainT('验证码已过期', 'Code expired')));
-    }
     const base = (settings.island.baseUrl || 'http://127.0.0.1:9840').replace(/\/+$/, '');
     // 单行 + 不影响灵动岛宽度：
     //   - 验证码放进短标题，紧凑单行直接可见；

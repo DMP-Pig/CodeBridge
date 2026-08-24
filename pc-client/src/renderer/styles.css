@@ -844,42 +844,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(18, 
 .device-chip.offline .device-dot { background: var(--danger); }
 .device-chip.offline { opacity: 0.62; }
 
-/* 验证码倒计时 / 过期 */
-.hero-ttl {
-  font-size: 11.5px; font-family: "Cascadia Code", Consolas, monospace;
-  color: var(--ok); background: rgba(94,230,160,0.12);
-  padding: 3px 10px; border-radius: 999px;
-  border: 1px solid rgba(94,230,160,0.25); flex-shrink: 0;
-  transition: all 0.3s ease;
-}
-.hero-ttl.expired { color: var(--danger); background: rgba(255,122,133,0.12); border-color: rgba(255,122,133,0.28); }
-.hero-code.expired { filter: grayscale(1); opacity: 0.42; transition: all 0.5s ease; }
-.hero-content.expired-card { opacity: 0.8; }
-.history-card.expired-card { opacity: 0.66; }
-.history-code.expired { opacity: 0.4; filter: grayscale(1); }
-.history-ttl { font-size: 10.5px; color: var(--ok); margin-top: 3px; font-family: "Cascadia Code", Consolas, monospace; letter-spacing: 0.3px; }
-.history-ttl.expired { color: var(--danger); }
 .mini-btn:disabled, .glass-btn:disabled { opacity: 0.35; cursor: not-allowed; transform: none !important; }
 
-/* 隐私模式 */
-.privacy-on .hero-code,
-.privacy-on .history-code {
-  filter: blur(8px);
-  transition: filter 0.35s ease;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.privacy-on .hero-code:hover,
-.privacy-on .history-code:hover { filter: blur(2px); }
-.privacy-hidden .hero-code,
-.privacy-hidden .history-code,
-.privacy-hidden .hero-ttl,
-.privacy-hidden .history-ttl { filter: blur(18px) !important; opacity: 0.4; }
-.privacy-hidden .hero-app,
-.privacy-hidden .history-app { opacity: 0.55; }
 
 html[data-theme="light"] .device-chip { background: rgba(18,28,60,0.05); border-color: rgba(18,28,60,0.1); }
-html[data-theme="light"] .history-ttl { color: #0d8a4c; }
-html[data-theme="light"] .history-ttl.expired { color: #d64550; }
-html[data-theme="light"] .hero-ttl { background: rgba(13,138,76,0.1); border-color: rgba(13,138,76,0.25); color: #0d8a4c; }
-html[data-theme="light"] .hero-ttl.expired { background: rgba(214,69,80,0.1); border-color: rgba(214,69,80,0.25); color: #d64550; }
