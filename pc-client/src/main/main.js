@@ -3,7 +3,7 @@
  * 职责：局域网 HTTP 服务（接收手机推送的验证码）、设置持久化、
  *       WinIsland 上岛推送、剪贴板、窗口/托盘管理。
  */
-const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell, Notification } = require('electron');
 const http = require('http');
 const https = require('https');
 const path = require('path');
@@ -29,6 +29,7 @@ const DEFAULT_SETTINGS = {
     autoCopyRestoreSeconds: 60,  // 自动复制后 N 秒恢复原剪贴板（0=不恢复）        // 收到验证码自动复制到剪贴板
     autoIsland: false,      // 收到验证码自动推送到 WinIsland
     playSound: true,        // 收到验证码播放提示音
+    systemNotify: true,     // 收到验证码发送系统通知
   },
   island: {
     baseUrl: 'http://127.0.0.1:9840',
@@ -39,6 +40,7 @@ const DEFAULT_SETTINGS = {
   ui: {
     accent: '#6ea8ff',
     keepHistory: 50,        // 保留历史条数
+    autoCleanDays: 7,       // 自动清理天数（0=关闭）
     theme: 'dark',          // 'dark' | 'light' 深浅色主题
     language: 'zh',         // 'zh' | 'en' 界面语言
   },
@@ -146,10 +148,35 @@ function getLanIps() {
 
 // ---------------------------------------------------------------- 历史记录
 function addHistory(entry) {
+  autoCleanHistory();
   codeHistory.unshift(entry);
   const max = Math.max(10, settings.ui.keepHistory || 50);
   if (codeHistory.length > max) codeHistory.length = max;
   saveHistory();
+  // 系统通知
+  if (settings.behavior.systemNotify && Notification.isSupported()) {
+    try {
+      new Notification({
+        title: APP_NAME,
+        body: `${entry.app || mainT('短信', 'SMS')}: ${entry.code}`,
+      }).show();
+    } catch (err) { console.error('系统通知失败:', err); }
+  }
+}
+
+/**
+ * 自动清理：删除超过 N 天的历史记录（autoCleanDays=0 时关闭）
+ */
+function autoCleanHistory() {
+  const days = Math.max(0, Number(settings.ui.autoCleanDays) || 0);
+  if (days <= 0) return;
+  const cutoff = Date.now() - days * 86400000;
+  const before = codeHistory.length;
+  codeHistory = codeHistory.filter((e) => {
+    const t = e && e.time ? new Date(e.time).getTime() : NaN;
+    return Number.isNaN(t) || t >= cutoff;
+  });
+  if (codeHistory.length !== before) saveHistory();
 }
 
 // ---------------------------------------------------------------- 剪贴板
@@ -621,6 +648,7 @@ if (process.argv.includes('--copy-last')) {
 } else {
 app.whenReady().then(() => {
   loadHistory();
+  autoCleanHistory();
   registerIpc();
   createWindow();
   createTray();

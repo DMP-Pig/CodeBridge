@@ -19,6 +19,7 @@ const els = {
   btnIslandHero: $('#btnIslandHero'),
   btnClearHero: $('#btnClearHero'),
   historyList: $('#historyList'),
+  historySearch: $('#historySearch'),
   btnClearHistory: $('#btnClearHistory'),
   drawer: $('#drawer'),
   drawerScrim: $('#drawerScrim'),
@@ -36,6 +37,8 @@ const els = {
   btnUpdateDownload: $('#btnUpdateDownload'),
   btnUpdateDismiss: $('#btnUpdateDismiss'),
   btnCheckUpdate: $('#btnCheckUpdate'),
+  setSystemNotify: $('#setSystemNotify'),
+  setAutoClean: $('#setAutoClean'),
 };
 
 let settings = {};
@@ -43,6 +46,7 @@ let codes = [];
 let currentId = null;
 let activeHeroId = null;
 let updateInfo = null;
+let searchQuery = '';
 
 /* ---------------- 时间格式化 ---------------- */
 function fmtTime(iso) {
@@ -99,6 +103,7 @@ const I18N = {
     'hero.copy': '复制', 'hero.island': '上岛', 'hero.clear': '清空',
     'history.msg.defaultApp': '短信', 'history.title': '历史记录', 'history.clearAll': '清空全部',
     'history.empty': '暂无历史记录',
+    'history.searchPh': '搜索验证码 / 应用 / 来源…', 'history.searchEmpty': '无匹配结果',
     'history.actions.copy': '复制到剪贴板', 'history.actions.island': '推送到 WinIsland 灵动岛', 'history.actions.remove': '移除',
     'drawer.title': '设置',
     'group.lan': '局域网服务', 'group.after': '收到验证码后', 'group.island': 'WinIsland 上岛', 'group.ui': '界面',
@@ -111,6 +116,7 @@ const I18N = {
     'set.copyRestoreSecs': '恢复时间（秒）', 'set.copyRestoreSecsDesc': '复制验证码 N 秒后恢复原剪贴板',
     'set.autoIsland': '自动上岛', 'set.autoIslandDesc': '收到后自动推送到 WinIsland 灵动岛',
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
+    'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
     'set.islandUrl': '上岛 API 地址', 'set.islandUrlDesc': 'WinIsland 设置 → 上岛 API 中的地址',
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'WinIsland 中设置的 Token（留空则不传）',
     'set.islandIcon': '上岛图标', 'set.islandIconDesc': '支持 emoji（🔑）、文本或 \\uXXXX 转义（如 \\uE8D6）', 'set.islandIconPh': '\\uE8D6 或 🔑',
@@ -120,6 +126,7 @@ const I18N = {
     'set.language': '语言', 'set.languageDesc': '界面语言', 'lang.zh': '中文', 'lang.en': 'English',
     'set.accent': '强调色', 'set.accentDesc': '按钮与高亮使用的主题色',
     'set.keep': '保留历史条数', 'set.keepDesc': '最多保留的验证码历史数量',
+    'set.autoClean': '自动清理（天）', 'set.autoCleanDesc': '自动删除超过 N 天的历史记录（0=关闭）',
     'btn.settings': '设置', 'btn.testIsland': '测试上岛连接', 'btn.testingIsland': '测试中…',
     'btn.checkUpdate': '检查更新', 'btn.save': '保存设置',
     'toast.saved': '设置已保存，服务已生效', 'toast.copied': '已复制到剪贴板',
@@ -145,6 +152,7 @@ const I18N = {
     'hero.copy': 'Copy', 'hero.island': 'Island', 'hero.clear': 'Clear',
     'history.msg.defaultApp': 'SMS', 'history.title': 'History', 'history.clearAll': 'Clear All',
     'history.empty': 'No history yet',
+    'history.searchPh': 'Search code / app / source…', 'history.searchEmpty': 'No matches',
     'history.actions.copy': 'Copy to clipboard', 'history.actions.island': 'Push to WinIsland', 'history.actions.remove': 'Remove',
     'drawer.title': 'Settings',
     'group.lan': 'LAN Service', 'group.after': 'After receiving a code', 'group.island': 'WinIsland Island', 'group.ui': 'UI',
@@ -157,6 +165,7 @@ const I18N = {
     'set.copyRestoreSecs': 'Restore After (s)', 'set.copyRestoreSecsDesc': 'Seconds before restoring original clipboard',
     'set.autoIsland': 'Auto Island', 'set.autoIslandDesc': 'Push to WinIsland automatically',
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
+    'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
     'set.islandUrl': 'Island API URL', 'set.islandUrlDesc': 'Address in WinIsland Settings → Island API',
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'Token set in WinIsland (empty = not sent)',
     'set.islandIcon': 'Island Icon', 'set.islandIconDesc': 'emoji (🔑), text, or \\uXXXX escapes (e.g. \\uE8D6)', 'set.islandIconPh': '\\uE8D6 or 🔑',
@@ -166,6 +175,7 @@ const I18N = {
     'set.language': 'Language', 'set.languageDesc': 'Interface language', 'lang.zh': 'Chinese', 'lang.en': 'English',
     'set.accent': 'Accent Color', 'set.accentDesc': 'Color used for buttons & highlights',
     'set.keep': 'History Limit', 'set.keepDesc': 'Max codes kept in history',
+    'set.autoClean': 'Auto Clean (days)', 'set.autoCleanDesc': 'Delete history older than N days (0=off)',
     'btn.settings': 'Settings', 'btn.testIsland': 'Test Island', 'btn.testingIsland': 'Testing…',
     'btn.checkUpdate': 'Check Update', 'btn.save': 'Save Settings',
     'toast.saved': 'Settings saved', 'toast.copied': 'Copied to clipboard',
@@ -268,15 +278,26 @@ function showEmpty() {
 
 /* ---------------- 历史列表 ---------------- */
 function renderHistory() {
+  const query = searchQuery.trim().toLowerCase();
+  const shown = query
+    ? codes.filter((c) =>
+        (c.code || '').toLowerCase().includes(query) ||
+        (c.app || '').toLowerCase().includes(query) ||
+        (c.source || '').toLowerCase().includes(query))
+    : codes;
   if (codes.length === 0) {
     els.historyList.innerHTML = '<div class="empty-hint">' + t('history.empty') + '</div>';
     return;
   }
+  if (shown.length === 0) {
+    els.historyList.innerHTML = '<div class="empty-hint">' + t('history.searchEmpty') + '</div>';
+    return;
+  }
   els.historyList.innerHTML = '';
-  for (const entry of codes) {
+  for (const entry of shown) {
     const card = document.createElement('div');
     card.className = 'history-card';
-    card.style.animationDelay = `${Math.min(codes.indexOf(entry) * 40, 300)}ms`;
+    card.style.animationDelay = `${Math.min(shown.indexOf(entry) * 40, 300)}ms`;
     card.innerHTML = `
       <div class="history-code">${escapeHtml(entry.code)}</div>
       <div class="history-info">
@@ -341,12 +362,14 @@ function fillSettingsForm() {
   syncRestoreSecsEnabled();
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
   $('#setSound').checked = !!s.behavior?.playSound;
+  $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
   $('#setIslandToken').value = s.island?.token || '';
   $('#setIslandDuration').value = s.island?.durationSeconds ?? 30;
   $('#setIslandIcon').value = s.island?.icon || '\\uE8D6';
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
+  $('#setAutoClean').value = s.ui?.autoCleanDays ?? 7;
   $('#setTheme').value = s.ui?.theme || 'dark';
   $('#setLanguage').value = s.ui?.language || 'zh';
 }
@@ -385,6 +408,7 @@ async function saveSettings() {
       autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
       playSound: $('#setSound').checked,
+      systemNotify: $('#setSystemNotify').checked,
     },
     island: {
       baseUrl: $('#setIslandUrl').value.trim(),
@@ -395,6 +419,7 @@ async function saveSettings() {
     ui: {
       accent: $('#setAccent').value,
       keepHistory: clamp(parseInt($('#setKeep').value, 10), 10, 500),
+      autoCleanDays: clamp(parseInt($('#setAutoClean').value, 10), 0, 365),
       theme: $('#setTheme').value === 'light' ? 'light' : 'dark',
       language: $('#setLanguage').value === 'en' ? 'en' : 'zh',
     },
@@ -441,6 +466,10 @@ els.btnTestIsland.addEventListener('click', async () => {
   els.btnTestIsland.disabled = false;
   if (res && res.ok) toast('island', t('toast.islandTestOk'));
   else toast('err', (res && res.error) || t('toast.islandConnFail'));
+});
+els.historySearch.addEventListener('input', (e) => {
+  searchQuery = e.target.value;
+  renderHistory();
 });
 els.btnClearHistory.addEventListener('click', async () => {
   await api.clearCodes();

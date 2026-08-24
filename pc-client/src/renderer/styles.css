@@ -516,6 +516,12 @@ html, body {
 .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .field.num { width: 90px; }
 .field.color { width: 46px; height: 34px; padding: 2px; cursor: pointer; }
+.field.search {
+  flex: 1;
+  min-width: 0;
+  max-width: 240px;
+  font-family: inherit;
+}
 .drawer-foot { padding: 16px 22px 22px; border-top: 1px solid rgba(255,255,255,0.08); }
 
 /* ---------------- 开关 ---------------- */
