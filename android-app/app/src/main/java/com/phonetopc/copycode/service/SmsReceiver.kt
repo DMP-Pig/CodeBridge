@@ -7,6 +7,7 @@ import android.provider.Telephony
 import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings
+import com.phonetopc.copycode.data.Tls
 
 /**
  * 短信接收广播（备用通道）。
@@ -16,6 +17,7 @@ class SmsReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
+        Tls.init(context)
         val settings = Settings.get()
         if (!settings.autoSend || !settings.isValid()) return
 

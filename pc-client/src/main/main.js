@@ -1,6 +1,6 @@
 /**
  * PhoneToPCCopyCode · PC 端主进程
- * 职责：局域网 HTTP 服务（接收手机推送的验证码）、设置持久化、
+ * 职责：局域网 HTTPS 服务（TLS 加密接收手机推送的验证码）、设置持久化、
  *       WinIsland 上岛推送、剪贴板、窗口/托盘管理。
  */
 const { app, BrowserWindow, ipcMain, clipboard, Menu, Tray, nativeImage, shell, Notification } = require('electron');
@@ -17,6 +17,22 @@ const APP_NAME = 'CodeBridge';
 const APP_VERSION = app.getVersion();
 const VERIFY = process.argv.includes('--verify');
 const VERIFY_SHOT = process.argv.includes('--screenshot');
+
+// ---- TLS 自签证书：与手机端内置证书一致，实现验证码/Token 加密传输 ----
+let tlsCredentials = null;
+function loadTlsCredentials() {
+  try {
+    tlsCredentials = {
+      key: fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'tls', 'server.key'), 'utf8'),
+      cert: fs.readFileSync(path.join(__dirname, '..', '..', 'assets', 'tls', 'server.crt'), 'utf8'),
+    };
+  } catch (err) {
+    console.error('加载 TLS 证书失败，回退为明文 HTTP:', err.message);
+    tlsCredentials = null;
+  }
+}
+loadTlsCredentials();
+
 
 const DEFAULT_SETTINGS = {
   server: {
@@ -456,17 +472,17 @@ function startServer() {
   return new Promise((resolve, reject) => {
     stopServer();
     if (!settings.server.enabled) {
-      emitToRenderer('server:status', { running: false, port: settings.server.port, ips: [], error: '服务器已停用' });
+      emitToRenderer('server:status', { running: false, port: settings.server.port, ips: [], error: '服务器已停用', secure: !!tlsCredentials });
       return resolve(false);
     }
-    server = http.createServer(handleRequest);
+    server = tlsCredentials ? https.createServer(tlsCredentials, handleRequest) : http.createServer(handleRequest);
     server.on('error', (err) => {
-      emitToRenderer('server:status', { running: false, port: settings.server.port, ips: [], error: err.message });
+      emitToRenderer('server:status', { running: false, port: settings.server.port, ips: [], error: err.message, secure: !!tlsCredentials });
       reject(err);
     });
     server.listen(settings.server.port, '0.0.0.0', () => {
       const ips = getLanIps();
-      emitToRenderer('server:status', { running: true, port: settings.server.port, ips });
+      emitToRenderer('server:status', { running: true, port: settings.server.port, ips, secure: !!tlsCredentials });
       resolve(true);
     });
   });
@@ -766,11 +782,18 @@ async function runVerify() {
     await new Promise((r) => setTimeout(r, 1500));
     // 推送两条测试验证码
     const payload = JSON.stringify({ code: '820346', app: '测试短信', source: '13800000000' });
-    await fetch(`http://127.0.0.1:${settings.server.port}/api/code`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    }).catch(() => {});
+    await new Promise((resolve) => {
+      const req = https.request({
+        host: '127.0.0.1',
+        port: settings.server.port,
+        path: '/api/code',
+        method: 'POST',
+        rejectUnauthorized: false,
+        headers: { 'Content-Type': 'application/json' },
+      }, (res) => { res.resume(); res.on('end', resolve); });
+      req.on('error', () => resolve());
+      req.end(payload);
+    });
     await new Promise((r) => setTimeout(r, 2500));
     const result = await mainWindow.webContents.executeJavaScript(`(() => {
       const q = (s) => document.querySelector(s);

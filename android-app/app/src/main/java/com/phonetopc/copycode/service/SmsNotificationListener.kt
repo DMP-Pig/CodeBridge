@@ -9,6 +9,7 @@ import android.service.notification.StatusBarNotification
 import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings
+import com.phonetopc.copycode.data.Tls
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
@@ -24,6 +25,7 @@ class SmsNotificationListener : NotificationListenerService() {
         super.onCreate()
         // 服务可能单独启动（未经过 MainActivity），必须先初始化设置
         Settings.init(applicationContext)
+        Tls.init(applicationContext)
     }
 
     override fun onListenerConnected() {

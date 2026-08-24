@@ -2,12 +2,12 @@ package com.phonetopc.copycode.data
 
 import org.json.JSONObject
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 
 /**
  * 通过局域网把验证码发送到 PC 端。
- * 协议：POST http://<host>:<port>/api/code
+ * 协议：POST https://<host>:<port>/api/code（TLS 自签证书固定，Token 加密传输）
  * Body:  { "code": "...", "app": "...", "source": "...", "token": "..." }
  */
 object CodeSender {
@@ -26,13 +26,15 @@ object CodeSender {
         if (code.isBlank()) return SendResult(false, "验证码为空")
 
         return try {
-            val url = URL("http://$host:$port/api/code")
-            val conn = url.openConnection() as HttpURLConnection
+            val url = URL("https://$host:$port/api/code")
+            val conn = url.openConnection() as HttpsURLConnection
             try {
                 conn.requestMethod = "POST"
                 conn.connectTimeout = 5000
                 conn.readTimeout = 5000
                 conn.doOutput = true
+                conn.sslSocketFactory = Tls.sslContext().socketFactory
+                conn.hostnameVerifier = Tls.hostnameVerifier
                 conn.setRequestProperty("Content-Type", "application/json")
                 if (token.isNotBlank()) conn.setRequestProperty("X-P2P-Token", token)
 

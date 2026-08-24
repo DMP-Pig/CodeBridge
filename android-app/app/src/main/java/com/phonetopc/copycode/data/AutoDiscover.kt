@@ -2,10 +2,10 @@
 
 import java.util.Collections
 import org.json.JSONObject
-import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.URL
+import javax.net.ssl.HttpsURLConnection
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -22,12 +22,12 @@ data class FoundPc(
 
 /**
  * 自动搜索局域网内的 CodeBridge PC 端。
- * 命中条件：目标 http://<ip>:<port>/health 返回 JSON 且 name == "CodeBridge"。
+ * 命中条件：目标 https://<ip>:<port>/health 返回 JSON 且 name == "CodeBridge"（TLS 证书固定）。
  * 同一台 PC（相同 device id）只保留一条记录，优先显示局域网地址（非 127.0.0.1）。
  */
 object AutoDiscover {
 
-    private const val TIMEOUT_MS = 500
+    private const val TIMEOUT_MS = 800
     private const val MAX_THREADS = 24
     private const val WAIT_SECONDS = 20L
 
@@ -95,12 +95,14 @@ object AutoDiscover {
 
     private fun healthCheck(ip: String, port: Int): FoundPc? {
         return try {
-            val url = URL("http://$ip:$port/health")
-            val conn = url.openConnection() as HttpURLConnection
+            val url = URL("https://$ip:$port/health")
+            val conn = url.openConnection() as HttpsURLConnection
             try {
                 conn.connectTimeout = TIMEOUT_MS
                 conn.readTimeout = TIMEOUT_MS
                 conn.requestMethod = "GET"
+                conn.sslSocketFactory = Tls.sslContext().socketFactory
+                conn.hostnameVerifier = Tls.hostnameVerifier
                 if (conn.responseCode == 200) {
                     val body = conn.inputStream.bufferedReader().use { it.readText() }
                     val json = JSONObject(body)

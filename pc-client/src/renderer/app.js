@@ -110,9 +110,9 @@ const I18N = {
     'update.checking': '正在检查更新…',
     'init.status': '正在初始化…', 'status.service': '局域网服务',
     'status.running': '局域网服务运行中 · 端口 {port}',
-    'status.sub.running': '手机端可向以下地址发送验证码',
+    'status.sub.running': '手机端可向以下地址发送验证码', 'status.secure': 'HTTPS 加密传输（TLS）',
     'status.error': '服务异常', 'status.stopped': '服务已停用',
-    'status.sub.stopped': '请在设置中启用', 'status.noip': '未检测到局域网 IP',
+    'status.sub.stopped': '请在设置中启用', 'status.noip': '未检测到局域网 IP', 'status.unsecure': 'HTTP（未加密）',
     'ip.copy': '点击复制', 'ip.copied': '已复制 {url}',
     'hero.wait': '等待验证码', 'hero.waitSub': '手机发送验证码后，将在此处实时展示',
     'hero.copy': '复制', 'hero.island': '上岛', 'hero.clear': '清空',
@@ -169,9 +169,9 @@ const I18N = {
     'update.checking': 'Checking for updates…',
     'init.status': 'Initializing…', 'status.service': 'LAN Service',
     'status.running': 'LAN service running · port {port}',
-    'status.sub.running': 'Your phone can send codes to these addresses',
+    'status.sub.running': 'Your phone can send codes to these addresses', 'status.secure': 'Secure HTTPS (TLS)',
     'status.error': 'Service error', 'status.stopped': 'Service disabled',
-    'status.sub.stopped': 'Enable it in Settings', 'status.noip': 'No LAN IP detected',
+    'status.sub.stopped': 'Enable it in Settings', 'status.noip': 'No LAN IP detected', 'status.unsecure': 'HTTP (not encrypted)',
     'ip.copy': 'Click to copy', 'ip.copied': 'Copied {url}',
     'hero.wait': 'Waiting for code', 'hero.waitSub': 'Codes sent from your phone will appear here',
     'hero.copy': 'Copy', 'hero.island': 'Island', 'hero.clear': 'Clear',
@@ -253,7 +253,7 @@ function renderStatus(status) {
     els.statusCard.classList.add('running');
     els.statusCard.classList.remove('error');
     els.statusTitle.textContent = t('status.running', { port: status.port });
-    els.statusSub.textContent = t('status.sub.running');
+    els.statusSub.textContent = status.secure ? ('🔒 ' + t('status.secure')) : t('status.sub.running');
   } else if (status.error) {
     els.statusCard.classList.add('error');
     els.statusCard.classList.remove('running');
@@ -276,7 +276,8 @@ function renderStatus(status) {
     chip.title = t('ip.copy');
     chip.textContent = `${ip.name}: ${ip.address}:${status.port || settings.server?.port || 9841}`;
     chip.addEventListener('click', async () => {
-      const text = `http://${ip.address}:${status.port || settings.server?.port || 9841}`;
+      const scheme = status.secure ? 'https' : 'http';
+      const text = `${scheme}://${ip.address}:${status.port || settings.server?.port || 9841}`;
       api.writeClipboard(text).then(() => {
         chip.innerHTML = `<span class="copied">✓ ${escapeHtml(t('ip.copied', { url: text }))}</span>`;
         setTimeout(() => { chip.textContent = `${ip.name}: ${ip.address}:${status.port || settings.server?.port || 9841}`; }, 1600);
