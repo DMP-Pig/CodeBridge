@@ -5,6 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'" />
   <title>CodeBridge</title>
   <link rel="stylesheet" href="styles.css" />
+  <script src="error-capture.js"></script>
 </head>
 <body>
   <!-- 背景光斑 -->
@@ -124,6 +125,17 @@
         <div class="stats-trend" id="statsTrend"></div>
         <div class="stats-dist" data-i18n="stats.dist">今日来源分布</div>
         <div class="stats-apps" id="statsApps"></div>
+      </div>
+
+      <!-- 剪贴板历史 -->
+      <div class="glass-card stats-card" id="clipboardHistoryCard">
+        <div class="stats-head">
+          <span class="stats-title" data-i18n="clipboardHistory.title">剪贴板历史</span>
+          <div class="stats-nums">
+            <button class="text-btn" id="btnClearClipboardHistory" data-i18n="clipboardHistory.clear">清空</button>
+          </div>
+        </div>
+        <div class="clip-list" id="clipboardHistoryList"></div>
       </div>
 
       <!-- 历史记录 -->
@@ -290,6 +302,20 @@
             <div class="set-desc" data-i18n="set.clipboardSyncDesc">PC 剪贴板变化时自动同步到手机端</div>
           </div>
           <label class="switch"><input type="checkbox" id="setClipboardSync" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.clipboardHistory">剪贴板历史</div>
+            <div class="set-desc" data-i18n="set.clipboardHistoryDesc">记录本机剪贴板变化，可一键回拷</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setClipboardHistory" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.clipboardHistoryMax">保留条数</div>
+            <div class="set-desc" data-i18n="set.clipboardHistoryMaxDesc">剪贴板历史最多保留的条数</div>
+          </div>
+          <input class="field num" id="setClipboardHistoryMax" type="number" min="10" max="500" />
         </div>
         <div class="set-row">
           <div class="set-info">

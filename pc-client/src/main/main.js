@@ -55,6 +55,7 @@ const DEFAULT_SETTINGS = {
     commandArgs: '{code}',  // 命令参数模板，支持 {code} {app} {source}
     autoLaunch: false,      // 开机自启
     clipboardSync: false,   // 发布剪贴板到手机（反向剪贴板）
+    clipboardHistoryEnabled: true,   // PC 剪贴板历史记录
     speakCode: false,       // 收到验证码语音播报
     filterMode: 'off',      // 来源过滤器：关闭 | 白名单 | 黑名单
     filterNumbers: '',      // 过滤列表：号码前缀/应用名，每行一个
@@ -74,6 +75,7 @@ const DEFAULT_SETTINGS = {
     accent: '#6ea8ff',
     keepHistory: 50,        // 保留历史条数
     autoCleanDays: 7,       // 自动清理天数（0=关闭）
+    clipboardHistoryMax: 100,   // 剪贴板历史保留条数
     theme: 'dark',          // 'dark' | 'light' 深浅色主题
     language: 'zh',         // 'zh' | 'en' 界面语言
   },
@@ -217,9 +219,38 @@ function autoCleanHistory() {
 let syncedClipboard = '';
 let clipboardSyncRev = Date.now();
 let clipboardWatchTimer = null;
+const clipboardHistoryMaxDefault = 100;
+let clipboardHistory = [];
+function clipboardHistoryFile() {
+  return path.join(app.getPath('userData'), 'clipboardHistory.json');
+}
+function loadClipboardHistory() {
+  try {
+    const arr = JSON.parse(fs.readFileSync(clipboardHistoryFile(), 'utf8'));
+    clipboardHistory = Array.isArray(arr) ? arr : [];
+  } catch { clipboardHistory = []; }
+}
+function saveClipboardHistory() {
+  if (VERIFY) return;
+  try { fs.writeFileSync(clipboardHistoryFile(), JSON.stringify(clipboardHistory)); } catch { /* 忽略 */ }
+}
+function recordClipboardEntry(text, source) {
+  if (VERIFY) return;
+  if (settings.behavior.clipboardHistoryEnabled === false) return;
+  const t = String(text || '');
+  if (!t.trim()) return;
+  const last = clipboardHistory[0];
+  if (last && last.text === t && Date.now() - new Date(last.time).getTime() < 5000) return;
+  clipboardHistory.unshift({ id: crypto.randomUUID(), text: t, time: new Date().toISOString(), source: source || 'manual' });
+  const max = Math.max(1, Number(settings.ui.clipboardHistoryMax) || clipboardHistoryMaxDefault);
+  if (clipboardHistory.length > max) clipboardHistory.length = max;
+  saveClipboardHistory();
+  emitToRenderer('clipboard-history:changed', { items: clipboardHistory });
+}
 function startClipboardWatch() {
   if (clipboardWatchTimer) { clearInterval(clipboardWatchTimer); clipboardWatchTimer = null; }
-  if (!settings.behavior.clipboardSync) return;
+  const historyOn = settings.behavior.clipboardHistoryEnabled !== false;
+  if (!settings.behavior.clipboardSync && !historyOn) return;
   try { syncedClipboard = clipboard.readText(); } catch { syncedClipboard = ''; }
   clipboardSyncRev = Date.now();
   clipboardWatchTimer = setInterval(() => {
@@ -228,14 +259,16 @@ function startClipboardWatch() {
       if (t !== syncedClipboard) {
         syncedClipboard = t;
         clipboardSyncRev = Date.now();
+        if (historyOn) recordClipboardEntry(t, 'manual');
       }
     } catch { /* 忽略剪贴板读取失败 */ }
   }, 1000);
 }
 
 // ---------------------------------------------------------------- 剪贴板
-function copyText(text) {
+function copyText(text, source) {
   clipboard.writeText(text || '');
+  recordClipboardEntry(text, source || 'manual');
 }
 
 /**
@@ -249,14 +282,14 @@ function autoCopyWithRestore(code) {
   if (!enabled) {
     if (clipboardRestoreTimer) { clearTimeout(clipboardRestoreTimer); clipboardRestoreTimer = null; }
     clipboardRestoreValue = null;
-    copyText(code);
+    copyText(code, 'auto');
     return;
   }
   // 首次复制前保存当前剪贴板（后续验证码不覆盖原值）
   if (clipboardRestoreTimer == null) {
     clipboardRestoreValue = clipboard.readText();
   }
-  copyText(code);
+  copyText(code, 'auto');
   if (clipboardRestoreTimer) clearTimeout(clipboardRestoreTimer);
   if (secs > 0) {
     clipboardRestoreTimer = setTimeout(() => {
@@ -264,7 +297,7 @@ function autoCopyWithRestore(code) {
       const prev = clipboardRestoreValue;
       clipboardRestoreValue = null;
       if (prev != null) {
-        copyText(prev);
+        copyText(prev, 'restore');
         emitToRenderer('action:notice', { kind: 'copy', text: mainT('剪贴板已恢复为原内容', 'Clipboard restored') });
       }
     }, secs * 1000);
@@ -992,6 +1025,28 @@ function registerIpc() {
   ipcMain.handle('code:clear', () => { codeHistory = []; saveHistory(); return true; });
 
   ipcMain.handle('clipboard:write', (_e, text) => { copyText(String(text || '')); return true; });
+  ipcMain.handle('clipboard-history:list', () => ({
+    enabled: settings.behavior.clipboardHistoryEnabled !== false,
+    max: Number(settings.ui.clipboardHistoryMax) || clipboardHistoryMaxDefault,
+    items: clipboardHistory,
+  }));
+  ipcMain.handle('clipboard-history:clear', () => {
+    clipboardHistory = [];
+    saveClipboardHistory();
+    emitToRenderer('clipboard-history:changed', { items: [] });
+    return true;
+  });
+  ipcMain.handle('clipboard-history:copy', (_e, id) => {
+    const entry = clipboardHistory.find((x) => x.id === id);
+    if (entry) copyText(entry.text, 'history');
+    return !!entry;
+  });
+  ipcMain.handle('clipboard-history:remove', (_e, id) => {
+    clipboardHistory = clipboardHistory.filter((x) => x.id !== id);
+    saveClipboardHistory();
+    emitToRenderer('clipboard-history:changed', { items: clipboardHistory });
+    return true;
+  });
   ipcMain.handle('action:test-webhook', () => {
     triggerWebhookScript({
       id: 'test-' + Date.now(),
@@ -1006,7 +1061,7 @@ function registerIpc() {
 
   ipcMain.handle('code:copy', (_e, id) => {
     const entry = codeHistory.find((c) => c.id === id);
-    if (entry) { copyText(entry.code); return true; }
+    if (entry) { copyText(entry.code, 'history'); return true; }
     return false;
   });
 
@@ -1157,12 +1212,14 @@ if (process.argv.includes('--type-last')) {
 // 被 WinIsland 灵动岛按钮启动：把最后一条验证码复制到剪贴板后退出
   app.whenReady().then(() => {
     loadHistory();
-    if (codeHistory[0]) copyText(codeHistory[0].code);
+    loadClipboardHistory();
+    if (codeHistory[0]) copyText(codeHistory[0].code, 'history');
     app.exit(0);
   });
 } else {
 app.whenReady().then(() => {
   loadHistory();
+  loadClipboardHistory();
   autoCleanHistory();
   registerIpc();
   applyAutoLaunch();

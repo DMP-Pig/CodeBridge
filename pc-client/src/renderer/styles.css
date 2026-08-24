@@ -310,6 +310,16 @@ html, body {
 .trend-label { font-size: 9px; color: var(--text-faint); }
 html[data-theme="light"] .stat-chip { background: rgba(18, 28, 60, 0.05); border-color: rgba(18, 28, 60, 0.12); }
 html[data-theme="light"] .stats-bar { background: rgba(18, 28, 60, 0.1); }
+.clip-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.clip-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); cursor: pointer; transition: background .2s ease, transform .15s var(--ease-spring); }
+.clip-row:hover { background: rgba(255, 255, 255, 0.09); transform: scale(1.01); }
+.clip-text { flex: 1; min-width: 0; font-size: 12px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-family: "Cascadia Code", Consolas, monospace; }
+.clip-badge { flex: none; font-size: 9px; color: var(--ok); border: 1px solid rgba(94, 230, 160, 0.4); border-radius: 999px; padding: 1px 6px; }
+.clip-time { flex: none; font-size: 10px; color: var(--text-faint); font-family: "Cascadia Code", Consolas, monospace; }
+.clip-x { flex: none; width: 20px; height: 20px; border: none; background: transparent; color: var(--text-faint); font-size: 14px; line-height: 1; border-radius: 50%; cursor: pointer; }
+.clip-x:hover { color: var(--danger); background: rgba(255, 122, 133, 0.12); }
+html[data-theme="light"] .clip-row { background: rgba(18, 28, 60, 0.05); }
+html[data-theme="light"] .clip-row:hover { background: rgba(18, 28, 60, 0.1); }
 
 /* ---------------- 扫码配对 ---------------- */
 .pair-row { align-items: center; }

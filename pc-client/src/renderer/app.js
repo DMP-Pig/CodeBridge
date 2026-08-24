@@ -30,6 +30,10 @@ const els = {
   btnExportCsv: $('#btnExportCsv'),
   btnExportJson: $('#btnExportJson'),
   btnImportHistory: $('#btnImportHistory'),
+  clipboardHistoryList: $('#clipboardHistoryList'),
+  btnClearClipboardHistory: $('#btnClearClipboardHistory'),
+  setClipboardHistory: $('#setClipboardHistory'),
+  setClipboardHistoryMax: $('#setClipboardHistoryMax'),
   drawer: $('#drawer'),
   drawerScrim: $('#drawerScrim'),
   drawerClose: $('#drawerClose'),
@@ -159,7 +163,7 @@ const I18N = {
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
         'set.autoLaunch': '开机自启', 'set.autoLaunchDesc': '系统登录时自动启动 CodeBridge 并后台运行',
-        'set.clipboardSync': '同步剪贴板到手机', 'set.clipboardSyncDesc': 'PC 剪贴板变化时自动同步到手机端',
+        'set.clipboardSync': '同步剪贴板到手机', 'set.clipboardSyncDesc': 'PC 剪贴板变化时自动同步到手机端', 'set.clipboardHistory': '剪贴板历史', 'set.clipboardHistoryDesc': '记录本机剪贴板变化，可一键回拷', 'set.clipboardHistoryMax': '保留条数', 'set.clipboardHistoryMaxDesc': '剪贴板历史最多保留的条数', 'clipboardHistory.title': '剪贴板历史', 'clipboardHistory.empty': '暂无剪贴板记录', 'clipboardHistory.auto': '自动复制', 'clipboardHistory.copied': '已复制到剪贴板', 'clipboardHistory.clear': '清空', 'clipboardHistory.del': '删除', 'clipboardHistory.open': '点击回拷',
         'set.filterMode': '来源过滤器', 'set.filterModeDesc': '按发件号码或来源应用允许/拦截验证码',
         'filter.off': '关闭', 'filter.whitelist': '仅允许列表中的来源', 'filter.blacklist': '拦截列表中的来源',
         'set.filterNumbers': '来源列表', 'set.filterNumbersDesc': '每行一个：号码前缀或应用名（如 10086、淘宝）',
@@ -242,7 +246,7 @@ const I18N = {
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
         'set.autoLaunch': 'Launch at Login', 'set.autoLaunchDesc': 'Start CodeBridge in the background at system login',
-        'set.clipboardSync': 'Sync Clipboard to Phone', 'set.clipboardSyncDesc': 'Auto-sync PC clipboard changes to the phone',
+        'set.clipboardSync': 'Sync Clipboard to Phone', 'set.clipboardSyncDesc': 'Auto-sync PC clipboard changes to the phone', 'set.clipboardHistory': 'Clipboard History', 'set.clipboardHistoryDesc': 'Record PC clipboard changes for one-click re-copy', 'set.clipboardHistoryMax': 'Max Entries', 'set.clipboardHistoryMaxDesc': 'Maximum clipboard history entries to keep', 'clipboardHistory.title': 'Clipboard History', 'clipboardHistory.empty': 'No clipboard entries', 'clipboardHistory.auto': 'Auto', 'clipboardHistory.copied': 'Copied to clipboard', 'clipboardHistory.clear': 'Clear', 'clipboardHistory.del': 'Delete', 'clipboardHistory.open': 'Click to re-copy',
         'set.filterMode': 'Source Filter', 'set.filterModeDesc': 'Allow or block codes by sender number or source app',
         'filter.off': 'Off', 'filter.whitelist': 'Allow only listed sources', 'filter.blacklist': 'Block listed sources',
         'set.filterNumbers': 'Source List', 'set.filterNumbersDesc': 'One per line: number prefix or app name (e.g. 10086, Taobao)',
@@ -576,6 +580,8 @@ function fillSettingsForm() {
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setAutoLaunch').checked = !!s.behavior?.autoLaunch;
   $('#setClipboardSync').checked = !!s.behavior?.clipboardSync;
+  $('#setClipboardHistory').checked = s.behavior?.clipboardHistoryEnabled !== false;
+  $('#setClipboardHistoryMax').value = s.ui?.clipboardHistoryMax ?? 100;
   $('#setFilterMode').value = s.behavior?.filterMode || 'off';
   $('#setFilterNumbers').value = s.behavior?.filterNumbers || '';
   $('#setWebhookEnabled').checked = !!s.behavior?.webhookEnabled;
@@ -645,6 +651,7 @@ async function saveSettings() {
       systemNotify: $('#setSystemNotify').checked,
       autoLaunch: $('#setAutoLaunch').checked,
       clipboardSync: $('#setClipboardSync').checked,
+      clipboardHistoryEnabled: $('#setClipboardHistory').checked,
       filterMode: $('#setFilterMode').value || 'off',
       filterNumbers: $('#setFilterNumbers').value,
       webhookEnabled: $('#setWebhookEnabled').checked,
@@ -667,6 +674,7 @@ async function saveSettings() {
       accent: $('#setAccent').value,
       keepHistory: clamp(parseInt($('#setKeep').value, 10), 10, 500),
       autoCleanDays: clamp(parseInt($('#setAutoClean').value, 10), 0, 365),
+      clipboardHistoryMax: clamp(parseInt($('#setClipboardHistoryMax').value, 10), 10, 500),
       theme: $('#setTheme').value === 'light' ? 'light' : 'dark',
       language: $('#setLanguage').value === 'en' ? 'en' : 'zh',
     },
@@ -678,6 +686,7 @@ async function saveSettings() {
   applyI18n();
   if (activeHeroId) { const cur = codes.find((c) => c.id === activeHeroId); if (cur) showHero(cur); }
   renderHistory();
+  renderClipboardHistory();
   const status = await api.getServerStatus();
   renderStatus(status);
   toast('ok', t('toast.saved'));
@@ -818,6 +827,45 @@ els.btnImportHistory.addEventListener('click', async () => {
     toast('err', t('toast.importErr'));
   }
 });
+/* ---------------- 剪贴板历史 ---------------- */
+let clipboardHistoryCache = [];
+async function renderClipboardHistory() {
+  const data = await api.listClipboardHistory().catch(() => null);
+  if (data) clipboardHistoryCache = data.items || [];
+  const list = els.clipboardHistoryList;
+  list.innerHTML = '';
+  if (!clipboardHistoryCache.length) {
+    list.innerHTML = '<div class="stats-empty">' + t('clipboardHistory.empty') + '</div>';
+    return;
+  }
+  clipboardHistoryCache.slice(0, 12).forEach((it) => {
+    const row = document.createElement('div');
+    row.className = 'clip-row' + (it.source === 'auto' ? ' is-auto' : '');
+    row.title = t('clipboardHistory.open');
+    const badge = it.source === 'auto'
+      ? '<span class="clip-badge">' + t('clipboardHistory.auto') + '</span>'
+      : '';
+    row.innerHTML = '<span class="clip-text">' + escapeHtml(it.text) + '</span>' + badge +
+      '<span class="clip-time">' + fmtTime(it.time) + '</span>' +
+      '<button class="clip-x" title="' + t('clipboardHistory.del') + '">×</button>';
+    row.addEventListener('click', async () => {
+      await api.copyClipboardHistory(it.id);
+      toast('copy', t('clipboardHistory.copied'));
+    });
+    row.querySelector('.clip-x').addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await api.removeClipboardHistory(it.id);
+      renderClipboardHistory();
+    });
+    list.appendChild(row);
+  });
+}
+els.btnClearClipboardHistory.addEventListener('click', async () => {
+  await api.clearClipboardHistory();
+  renderClipboardHistory();
+  toast('ok', t('toast.historyCleared'));
+});
+
 els.btnCopyHero.addEventListener('click', () => handleAction('copy', activeHeroId));
 els.btnIslandHero.addEventListener('click', () => handleAction('island', activeHeroId));
 els.btnClearHero.addEventListener('click', () => handleAction('remove', activeHeroId));
@@ -864,6 +912,8 @@ api.on('code:new', (entry) => {
 api.on('server:status', (status) => renderStatus(status));
 
 api.on('device:status', (list) => renderDevices(list));
+
+api.on('clipboard-history:changed', () => renderClipboardHistory());
 
 api.on('action:notice', (notice) => {
   const kindMap = { copy: 'copy', island: 'island', error: 'err', input: 'ok' };
