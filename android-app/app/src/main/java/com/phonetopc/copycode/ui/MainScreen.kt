@@ -20,6 +20,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -29,8 +30,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -54,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.phonetopc.copycode.data.AutoDiscover
+import com.phonetopc.copycode.data.PcConfig
 import com.phonetopc.copycode.data.FoundPc
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings as AppSettings
@@ -83,6 +87,8 @@ fun MainScreen() {
     var statusOk by remember { mutableStateOf(true) }
     var foundHosts by remember { mutableStateOf<List<FoundPc>?>(null) }
     var lastSearchPort by remember { mutableStateOf(AppSettings.DEFAULT_PORT) }
+    var configs by remember { mutableStateOf(settings.pcConfigs()) }
+    var activeIdx by remember { mutableStateOf(settings.activeIndex()) }
 
     var listenerEnabled by remember { mutableStateOf(isNotificationAccessEnabled(context)) }
     var smsGranted by remember {
@@ -136,9 +142,9 @@ fun MainScreen() {
                 host = h
                 port = p.toString()
                 token = tk
-                settings.pcHost = h
-                settings.pcPort = p
-                settings.token = tk
+                settings.applyActive(h, p, tk)
+                configs = settings.pcConfigs()
+                activeIdx = settings.activeIndex()
                 statusMsg = "扫码配对成功：$h:$p"
                 statusOk = true
             } catch (e: Exception) {
@@ -229,8 +235,9 @@ fun MainScreen() {
             val (h, pp) = parseHostPort("$ip:$p", p)
             host = h
             port = pp.toString()
-            settings.pcHost = h
-            settings.pcPort = pp
+            settings.applyActive(h, pp, settings.token)
+            configs = settings.pcConfigs()
+            activeIdx = settings.activeIndex()
         }
 
         Column(
@@ -255,6 +262,88 @@ fun MainScreen() {
             // 服务配置卡片
             GlassCard {
                 CardHeader(Icons.Default.Settings, "PC 接收端")
+
+                // 多 PC 配置：切换 / 添加 / 删除
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    configs.forEachIndexed { idx, cfg ->
+                        val selected = idx == activeIdx
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (selected) Accent.copy(alpha = 0.30f) else Color(0x14FFFFFF))
+                                .border(
+                                    BorderStroke(1.dp, if (selected) Accent.copy(alpha = 0.75f) else GlassBorder),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable {
+                                    activeIdx = idx
+                                    settings.switchTo(idx)
+                                    host = settings.pcHost
+                                    port = settings.pcPort.toString()
+                                    token = settings.token
+                                    statusMsg = "已切换到 ${if (cfg.name.isNotBlank()) cfg.name else cfg.host}"
+                                    statusOk = true
+                                }
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                        ) {
+                            Text(
+                                text = if (cfg.name.isNotBlank()) cfg.name else (cfg.host.ifBlank { "未命名 PC" }),
+                                color = if (selected) TextPrimary else TextDim,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassButton(
+                        text = "添加配置",
+                        icon = Icons.Default.Add,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        val (h, p) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
+                        if (h.isBlank()) {
+                            statusMsg = "请先填写 PC 地址"
+                            statusOk = false
+                        } else {
+                            settings.addConfig(PcConfig("PC ${configs.size + 1}", h, p, token.trim()))
+                            configs = settings.pcConfigs()
+                            activeIdx = settings.activeIndex()
+                            host = settings.pcHost
+                            port = settings.pcPort.toString()
+                            token = settings.token
+                            statusMsg = "已添加新配置"
+                            statusOk = true
+                        }
+                    }
+                    GlassButton(
+                        text = "删除当前",
+                        icon = Icons.Default.Delete,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (configs.size <= 1) {
+                            statusMsg = "至少保留一个配置"
+                            statusOk = false
+                        } else {
+                            val ok = settings.removeActiveConfig()
+                            configs = settings.pcConfigs()
+                            activeIdx = settings.activeIndex()
+                            host = settings.pcHost
+                            port = settings.pcPort.toString()
+                            token = settings.token
+                            statusMsg = if (ok) "已删除当前配置" else "至少保留一个配置"
+                            statusOk = ok
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassTextField(
                         value = host,
@@ -415,11 +504,11 @@ fun MainScreen() {
                         val (saveHost, savePort) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
                         host = saveHost
                         port = savePort.toString()
-                        settings.pcHost = saveHost
-                        settings.pcPort = savePort
-                        settings.token = token
+                        settings.applyActive(saveHost, savePort, token)
                         settings.autoSend = autoSend
                         settings.customRegex = customRegex
+                        configs = settings.pcConfigs()
+                        activeIdx = settings.activeIndex()
                         statusMsg = if (settings.isValid()) "设置已保存" else "请填写 PC 地址"
                         statusOk = settings.isValid()
                     }
