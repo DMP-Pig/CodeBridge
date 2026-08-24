@@ -528,6 +528,71 @@ function handleAutoActions(entry) {
       emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
     }, 600);
   }
+  // Webhook / 脚本触发
+  if (settings.behavior.webhookEnabled) {
+    triggerWebhookScript(entry);
+  }
+}
+
+// ---------------------------------------------------------------- Webhook / 脚本触发
+/** POST JSON 到 Webhook（http/https） */
+function postWebhook(url, entry) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(url); } catch (err) { return reject(new Error('URL 无效')); }
+    const mod = u.protocol === 'https:' ? https : http;
+    const body = JSON.stringify({ id: entry.id, code: entry.code, app: entry.app, source: entry.source, from: entry.from, time: entry.time });
+    const req = mod.request(u, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': APP_NAME,
+        'X-CodeBridge-Code': String(entry.code || ''),
+      },
+      timeout: 8000,
+    }, (res) => {
+      res.resume();
+      resolve(res.statusCode);
+    });
+    req.on('timeout', () => { req.destroy(new Error('timeout')); });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+/** 执行自定义命令/脚本，参数模板支持 {code} {app} {source} {time} {id} */
+function runScript(entry) {
+  const cmdPath = String(settings.behavior.commandPath || '').trim();
+  if (!cmdPath) return;
+  const tmpl = String(settings.behavior.commandArgs || '{code}');
+  const args = tmpl
+    .replace(/\{code\}/g, entry.code || '')
+    .replace(/\{app\}/g, entry.app || '')
+    .replace(/\{source\}/g, entry.source || '')
+    .replace(/\{time\}/g, entry.time || '')
+    .replace(/\{id\}/g, entry.id || '')
+    .trim()
+    .split(/\s+/)
+    .filter((x) => x.length > 0);
+  execFile(cmdPath, args, { timeout: 15000, windowsHide: true }, (err) => {
+    if (err) {
+      console.error('脚本执行失败:', err);
+      emitToRenderer('action:notice', { kind: 'error', text: mainT('脚本执行失败: ' + err.message, 'Script failed: ' + err.message) });
+    }
+  });
+}
+
+/** 验证码到达时触发 Webhook 与自定义脚本 */
+function triggerWebhookScript(entry) {
+  const url = String(settings.behavior.webhookUrl || '').trim();
+  if (url) {
+    postWebhook(url, entry)
+      .then((status) => emitToRenderer('action:notice', { kind: 'webhook', text: mainT('Webhook 已触发（HTTP ' + status + '）', 'Webhook triggered (HTTP ' + status + ')') }))
+      .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: mainT('Webhook 调用失败: ' + err.message, 'Webhook failed: ' + err.message) }));
+  }
+  runScript(entry);
 }
 
 function startServer() {
@@ -732,6 +797,17 @@ function registerIpc() {
   ipcMain.handle('code:clear', () => { codeHistory = []; saveHistory(); return true; });
 
   ipcMain.handle('clipboard:write', (_e, text) => { copyText(String(text || '')); return true; });
+  ipcMain.handle('action:test-webhook', () => {
+    triggerWebhookScript({
+      id: 'test-' + Date.now(),
+      code: '123456',
+      app: mainT('测试', 'Test'),
+      source: 'test',
+      from: '127.0.0.1',
+      time: new Date().toISOString(),
+    });
+    return true;
+  });
 
   ipcMain.handle('code:copy', (_e, id) => {
     const entry = codeHistory.find((c) => c.id === id);

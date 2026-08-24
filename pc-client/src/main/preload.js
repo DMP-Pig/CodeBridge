@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('p2p', {
   writeClipboard: (text) => ipcRenderer.invoke('clipboard:write', text),
   removeCode: (id) => ipcRenderer.invoke('code:remove', id),
   pushIsland: (id) => ipcRenderer.invoke('island:push', id),
+  testWebhook: () => ipcRenderer.invoke('action:test-webhook'),
   minimize: () => ipcRenderer.invoke('window:minimize'),
   maximize: () => ipcRenderer.invoke('window:maximize'),
   close: () => ipcRenderer.invoke('window:close'),

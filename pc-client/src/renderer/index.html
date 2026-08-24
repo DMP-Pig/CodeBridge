@@ -227,6 +227,39 @@
         </div>
         <div class="set-row">
           <div class="set-info">
+            <div class="set-name" data-i18n="set.webhook">Webhook / 脚本触发</div>
+            <div class="set-desc" data-i18n="set.webhookDesc">收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setWebhookEnabled" /><span class="track"></span></label>
+        </div>
+        <div id="webhookExtra" style="display:none">
+          <div class="set-row">
+            <div class="set-info">
+              <div class="set-name" data-i18n="set.webhookUrl">Webhook 地址</div>
+              <div class="set-desc" data-i18n="set.webhookUrlDesc">POST JSON，包含 code / app / source / time / from / id</div>
+            </div>
+            <input class="field" id="setWebhookUrl" type="text" placeholder="https://example.com/hook" />
+          </div>
+          <div class="set-row">
+            <div class="set-info">
+              <div class="set-name" data-i18n="set.scriptPath">命令 / 脚本路径</div>
+              <div class="set-desc" data-i18n="set.scriptPathDesc">收到验证码时执行的程序路径（留空则不执行）</div>
+            </div>
+            <input class="field" id="setCommandPath" type="text" placeholder="C:\scripts\notify.bat" />
+          </div>
+          <div class="set-row">
+            <div class="set-info">
+              <div class="set-name" data-i18n="set.scriptArgs">命令参数模板</div>
+              <div class="set-desc" data-i18n="set.scriptArgsDesc">支持 {code} {app} {source} {time} {id} 占位符</div>
+            </div>
+            <input class="field" id="setCommandArgs" type="text" placeholder="{code}" />
+          </div>
+          <div class="set-row">
+            <button class="glass-btn accent block" id="btnTestWebhook" data-i18n="btn.testWebhook">测试触发</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
             <div class="set-name" data-i18n="set.sound">提示音</div>
             <div class="set-desc" data-i18n="set.soundDesc">收到验证码时播放系统提示音</div>
           </div>

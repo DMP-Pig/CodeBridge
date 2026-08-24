@@ -52,6 +52,12 @@ const els = {
   btnUpdateDismiss: $('#btnUpdateDismiss'),
   btnCheckUpdate: $('#btnCheckUpdate'),
   setSystemNotify: $('#setSystemNotify'),
+  setWebhookEnabled: $('#setWebhookEnabled'),
+  setWebhookUrl: $('#setWebhookUrl'),
+  setCommandPath: $('#setCommandPath'),
+  setCommandArgs: $('#setCommandArgs'),
+  webhookExtra: $('#webhookExtra'),
+  btnTestWebhook: $('#btnTestWebhook'),
   setAutoClean: $('#setAutoClean'),
   pairQr: $('#pairQr'),
   pairQrHint: $('#pairQrHint'),
@@ -138,6 +144,12 @@ const I18N = {
     'set.autoInput': '自动输入', 'set.autoInputDesc': '收到后自动输入到当前焦点所在的输入框',
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
+        'set.webhook': 'Webhook / 脚本触发', 'set.webhookDesc': '收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本',
+        'set.webhookUrl': 'Webhook 地址', 'set.webhookUrlDesc': 'POST JSON，包含 code / app / source / time / from / id',
+        'set.scriptPath': '命令 / 脚本路径', 'set.scriptPathDesc': '收到验证码时执行的程序路径（留空则不执行）',
+        'set.scriptArgs': '命令参数模板', 'set.scriptArgsDesc': '支持 {code} {app} {source} {time} {id} 占位符',
+        'btn.testWebhook': '测试触发',
+        'toast.webhookTestOk': 'Webhook / 脚本已触发测试',
     'set.islandUrl': '上岛 API 地址', 'set.islandUrlDesc': 'WinIsland 设置 → 上岛 API 中的地址',
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'WinIsland 中设置的 Token（留空则不传）',
     'set.islandIcon': '上岛图标', 'set.islandIconDesc': '支持 emoji（🔑）、文本或 \\uXXXX 转义（如 \\uE8D6）', 'set.islandIconPh': '\\uE8D6 或 🔑',
@@ -201,6 +213,12 @@ const I18N = {
     'set.autoInput': 'Auto Type', 'set.autoInputDesc': 'Type the code into the currently focused input',
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
+        'set.webhook': 'Webhook / Script', 'set.webhookDesc': 'Call a webhook (POST JSON) or run a custom command when a code arrives',
+        'set.webhookUrl': 'Webhook URL', 'set.webhookUrlDesc': 'POST JSON with code / app / source / time / from / id',
+        'set.scriptPath': 'Command / Script Path', 'set.scriptPathDesc': 'Program to run on arrival (empty = disabled)',
+        'set.scriptArgs': 'Command Args Template', 'set.scriptArgsDesc': 'Supports {code} {app} {source} {time} {id} placeholders',
+        'btn.testWebhook': 'Test Trigger',
+        'toast.webhookTestOk': 'Test webhook / script triggered',
     'set.islandUrl': 'Island API URL', 'set.islandUrlDesc': 'Address in WinIsland Settings → Island API',
     'set.islandToken': 'WinIsland Token', 'set.islandTokenDesc': 'Token set in WinIsland (empty = not sent)',
     'set.islandIcon': 'Island Icon', 'set.islandIconDesc': 'emoji (🔑), text, or \\uXXXX escapes (e.g. \\uE8D6)', 'set.islandIconPh': '\\uE8D6 or 🔑',
@@ -489,6 +507,11 @@ function fillSettingsForm() {
   $('#setAutoInput').checked = !!s.behavior?.autoInput;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
+  $('#setWebhookEnabled').checked = !!s.behavior?.webhookEnabled;
+  $('#setWebhookUrl').value = s.behavior?.webhookUrl || '';
+  $('#setCommandPath').value = s.behavior?.commandPath || '';
+  $('#setCommandArgs').value = s.behavior?.commandArgs || '{code}';
+  syncWebhookEnabled();
   $('#setIslandUrl').value = s.island?.baseUrl || 'http://127.0.0.1:9840';
   $('#setIslandToken').value = s.island?.token || '';
   $('#setIslandDuration').value = s.island?.durationSeconds ?? 30;
@@ -510,6 +533,12 @@ function syncRestoreSecsEnabled() {
   if (!on) $('#setCopyRestore').value = $('#setCopyRestore').value || 60;
 }
 $('#setCopyRestoreEnabled').addEventListener('change', syncRestoreSecsEnabled);
+function syncWebhookEnabled() {
+  const on = $('#setWebhookEnabled').checked;
+  const box = $('#webhookExtra');
+  if (box) box.style.display = on ? '' : 'none';
+}
+$('#setWebhookEnabled').addEventListener('change', syncWebhookEnabled);
 $('#setTheme').addEventListener('change', () => {
   settings.ui = settings.ui || {};
   settings.ui.theme = $('#setTheme').value === 'light' ? 'light' : 'dark';
@@ -540,6 +569,10 @@ async function saveSettings() {
       autoInput: $('#setAutoInput').checked,
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,
+      webhookEnabled: $('#setWebhookEnabled').checked,
+      webhookUrl: $('#setWebhookUrl').value.trim(),
+      commandPath: $('#setCommandPath').value.trim(),
+      commandArgs: $('#setCommandArgs').value.trim() || '{code}',
     },
     island: {
       baseUrl: $('#setIslandUrl').value.trim(),
@@ -623,6 +656,17 @@ els.btnTestIsland.addEventListener('click', async () => {
   els.btnTestIsland.disabled = false;
   if (res && res.ok) toast('island', t('toast.islandTestOk'));
   else toast('err', (res && res.error) || t('toast.islandConnFail'));
+});
+els.btnTestWebhook.addEventListener('click', async () => {
+  await api.setSettings({
+    behavior: {
+      webhookUrl: $('#setWebhookUrl').value.trim(),
+      commandPath: $('#setCommandPath').value.trim(),
+      commandArgs: $('#setCommandArgs').value.trim() || '{code}',
+    },
+  });
+  await api.testWebhook();
+  toast('ok', t('toast.webhookTestOk'));
 });
 els.btnRefreshQr.addEventListener('click', loadPairQr);
 $('#setIslandIcon').addEventListener('input', updateIslandPreview);
