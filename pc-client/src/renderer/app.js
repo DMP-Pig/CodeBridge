@@ -36,6 +36,7 @@ const els = {
   setIslandShowApp: $('#setIslandShowApp'),
   setIslandAnimation: $('#setIslandAnimation'),
   setIslandClickAction: $('#setIslandClickAction'),
+  setIslandDisplay: $('#setIslandDisplay'),
   islandIconPresets: $('#islandIconPresets'),
   islandPreview: $('#islandPreview'),
   ipIcon: $('#ipIcon'),
@@ -175,6 +176,8 @@ const I18N = {
     'set.islandAnimation': '上岛动画', 'set.islandAnimationDesc': '选择上岛进入动画：默认 / 淡入 / 滑动 / 缩放',
     'anim.default': '默认（弹性缩放）', 'anim.fade': '淡入',     'set.islandClickAction': '上岛点击行为', 'set.islandClickActionDesc': '点击灵动岛按钮后：复制验证码到剪贴板，或自动输入到当前输入框',
     'click.copy': '复制到剪贴板', 'click.type': '输入到当前输入框',
+    'set.islandDisplay': '窗口显示屏幕', 'set.islandDisplayDesc': '主窗口打开的屏幕（跟随鼠标或指定显示器）；灵动岛实际屏幕由 WinIsland 窗口位置决定',
+    'display.auto': '自动（跟随鼠标所在屏幕）',
 'anim.slide': '底部滑入', 'anim.scale': '轻微缩放',
     'set.checkUpdate': '检查更新', 'set.checkUpdateDesc': '检查 GitHub 上是否有新版本',
     'set.theme': '主题', 'set.themeDesc': '深色/浅色显示模式', 'theme.dark': '深色', 'theme.light': '浅色',
@@ -254,6 +257,8 @@ const I18N = {
     'anim.default': 'Default (spring)', 'anim.fade': 'Fade', 'anim.slide': 'Slide up', 'anim.scale': 'Scale',
     'set.islandClickAction': 'Island Click Action', 'set.islandClickActionDesc': 'When the island button is clicked: copy the code, or type it into the focused input',
     'click.copy': 'Copy to clipboard', 'click.type': 'Type into focused input',
+    'set.islandDisplay': 'Window Display', 'set.islandDisplayDesc': 'Display for the main window (follow mouse or pick one); island display follows the WinIsland window position',
+    'display.auto': 'Auto (follow mouse display)',
     'set.checkUpdate': 'Check Update', 'set.checkUpdateDesc': 'Check GitHub for a newer version',
     'set.theme': 'Theme', 'set.themeDesc': 'Dark or light appearance', 'theme.dark': 'Dark', 'theme.light': 'Light',
     'set.language': 'Language', 'set.languageDesc': 'Interface language', 'lang.zh': 'Chinese', 'lang.en': 'English',
@@ -499,6 +504,7 @@ function openDrawer() {
   els.drawerScrim.classList.add('open');
   fillSettingsForm();
   loadPairQr();
+  refreshDisplayOptions();
 }
 function closeDrawer() {
   els.drawer.classList.remove('open');
@@ -548,6 +554,7 @@ function fillSettingsForm() {
   $('#setIslandShowApp').checked = s.island?.showAppInBody !== false;
   $('#setIslandAnimation').value = s.island?.animation || 'default';
   $('#setIslandClickAction').value = s.island?.clickAction || 'copy';
+  $('#setIslandDisplay').value = String(s.island?.displayIndex ?? -1);
 
   $('#setAccent').value = s.ui?.accent || '#6ea8ff';
   $('#setKeep').value = s.ui?.keepHistory ?? 50;
@@ -617,6 +624,7 @@ async function saveSettings() {
       showAppInBody: $('#setIslandShowApp').checked,
       animation: $('#setIslandAnimation').value || 'default',
       clickAction: $('#setIslandClickAction').value === 'type' ? 'type' : 'copy',
+      displayIndex: parseInt(els.setIslandDisplay.value, 10) || -1,
     },
     ui: {
       accent: $('#setAccent').value,
@@ -667,6 +675,29 @@ function playIslandPreview() {
 function clamp(n, min, max) {
   if (Number.isNaN(n)) return min;
   return Math.min(max, Math.max(min, n));
+}
+
+async function refreshDisplayOptions() {
+  if (!els.setIslandDisplay) return;
+  let list = [];
+  try { list = (await api.listDisplays()) || []; } catch { list = []; }
+  const current = els.setIslandDisplay.value;
+  els.setIslandDisplay.innerHTML = '';
+  const auto = document.createElement('option');
+  auto.value = '-1';
+  auto.textContent = t('display.auto');
+  els.setIslandDisplay.appendChild(auto);
+  (list || []).forEach((d) => {
+    const opt = document.createElement('option');
+    opt.value = String(d.index);
+    opt.textContent = d.label + (d.primary ? '（主屏）' : '') + ' · ' + d.workArea.width + '×' + d.workArea.height;
+    els.setIslandDisplay.appendChild(opt);
+  });
+  if (current && els.setIslandDisplay.querySelector('option[value="' + current + '"]')) {
+    els.setIslandDisplay.value = current;
+  } else {
+    els.setIslandDisplay.value = '-1';
+  }
 }
 
 /* ---------------- 事件绑定 ---------------- */

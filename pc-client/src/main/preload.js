@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('p2p', {
   getServerStatus: () => ipcRenderer.invoke('server:status'),
   listCodes: () => ipcRenderer.invoke('code:list'),
   listDevices: () => ipcRenderer.invoke('devices:list'),
+  listDisplays: () => ipcRenderer.invoke('displays:list'),
   clearCodes: () => ipcRenderer.invoke('code:clear'),
   copyCode: (id) => ipcRenderer.invoke('code:copy', id),
   writeClipboard: (text) => ipcRenderer.invoke('clipboard:write', text),

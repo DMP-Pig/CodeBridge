@@ -767,6 +767,31 @@ function emitToRenderer(channel, payload) {
   }
 }
 
+// ---------------------------------------------------------------- 多显示器
+function getDisplaysBrief() {
+  try {
+    const all = screen.getAllDisplays();
+    const primary = screen.getPrimaryDisplay();
+    return all.map((d, i) => ({
+      index: i,
+      id: d.id,
+      primary: d.id === primary.id,
+      label: '显示器 ' + (i + 1),
+      bounds: d.bounds,
+      workArea: d.workArea,
+    }));
+  } catch { return []; }
+}
+function pickTargetDisplay() {
+  try {
+    const list = screen.getAllDisplays();
+    if (list.length === 0) return null;
+    const idx = Number(settings.island.displayIndex) || -1;
+    if (idx >= 0 && list[idx]) return list[idx];
+    try { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()); } catch { return screen.getPrimaryDisplay(); }
+  } catch { return null; }
+}
+
 // ---------------------------------------------------------------- 窗口
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -788,7 +813,22 @@ function createWindow() {
     },
   });
 
-  mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  // 多显示器：跟随鼠标所在屏幕或按设置的目标显示器定位主窗口
+  try {
+    const disp = pickTargetDisplay();
+    if (disp && disp.workArea) {
+      const wa = disp.workArea;
+      const w = Math.min(1120, wa.width);
+      const h = Math.min(760, wa.height);
+      mainWindow.setBounds({
+        x: wa.x + Math.round((wa.width - w) / 2),
+        y: wa.y + Math.round((wa.height - h) / 2),
+        width: w,
+        height: h,
+      });
+    }
+  } catch (err) { console.error('定位窗口失败:', err); }
+    mainWindow.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   mainWindow.once('ready-to-show', () => mainWindow.show());
   // 关闭主界面窗口 = 隐藏到系统托盘，局域网服务继续后台运行（满足“后台存活”）
   mainWindow.on('close', (e) => {
@@ -884,6 +924,7 @@ function registerIpc() {
   ipcMain.handle('code:list', () => codeHistory);
 
   ipcMain.handle('devices:list', () => devicesToArray());
+  ipcMain.handle('displays:list', () => getDisplaysBrief());
 
   ipcMain.handle('code:clear', () => { codeHistory = []; saveHistory(); return true; });
 
