@@ -8,6 +8,7 @@ import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
+import com.phonetopc.copycode.widget.CodeWidgetProvider
 
 /**
  * 短信接收广播（备用通道）。
@@ -29,6 +30,7 @@ class SmsReceiver : BroadcastReceiver() {
 
         val code = CodeExtractor.extract(body, settings.customRegex) ?: return
         CodeBubble.show(context, code, "\u77ed\u4fe1")
+        CodeWidgetProvider.notifyNewCode(context, code, "\u77ed\u4fe1")
 
         val result = goAsync()
         Thread {

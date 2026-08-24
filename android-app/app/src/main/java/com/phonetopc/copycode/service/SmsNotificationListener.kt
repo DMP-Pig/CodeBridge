@@ -15,6 +15,7 @@ import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
+import com.phonetopc.copycode.widget.CodeWidgetProvider
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -185,6 +186,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
         // Floating bubble: show the code on the phone screen (tap to copy)
         CodeBubble.show(applicationContext, code, friendlyAppName(sbn.packageName))
+        CodeWidgetProvider.notifyNewCode(applicationContext, code, friendlyAppName(sbn.packageName))
 
         val source = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: sbn.packageName
         Thread {
