@@ -55,6 +55,8 @@ const els = {
   setWebhookEnabled: $('#setWebhookEnabled'),
   setAutoLaunch: $('#setAutoLaunch'),
   setClipboardSync: $('#setClipboardSync'),
+  setFilterMode: $('#setFilterMode'),
+  setFilterNumbers: $('#setFilterNumbers'),
   setWebhookUrl: $('#setWebhookUrl'),
   setCommandPath: $('#setCommandPath'),
   setCommandArgs: $('#setCommandArgs'),
@@ -148,6 +150,9 @@ const I18N = {
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
         'set.autoLaunch': '开机自启', 'set.autoLaunchDesc': '系统登录时自动启动 CodeBridge 并后台运行',
         'set.clipboardSync': '同步剪贴板到手机', 'set.clipboardSyncDesc': 'PC 剪贴板变化时自动同步到手机端',
+        'set.filterMode': '来源过滤器', 'set.filterModeDesc': '按发件号码或来源应用允许/拦截验证码',
+        'filter.off': '关闭', 'filter.whitelist': '仅允许列表中的来源', 'filter.blacklist': '拦截列表中的来源',
+        'set.filterNumbers': '来源列表', 'set.filterNumbersDesc': '每行一个：号码前缀或应用名（如 10086、淘宝）',
         'set.webhook': 'Webhook / 脚本触发', 'set.webhookDesc': '收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本',
         'set.webhookUrl': 'Webhook 地址', 'set.webhookUrlDesc': 'POST JSON，包含 code / app / source / time / from / id',
         'set.scriptPath': '命令 / 脚本路径', 'set.scriptPathDesc': '收到验证码时执行的程序路径（留空则不执行）',
@@ -219,6 +224,9 @@ const I18N = {
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
         'set.autoLaunch': 'Launch at Login', 'set.autoLaunchDesc': 'Start CodeBridge in the background at system login',
         'set.clipboardSync': 'Sync Clipboard to Phone', 'set.clipboardSyncDesc': 'Auto-sync PC clipboard changes to the phone',
+        'set.filterMode': 'Source Filter', 'set.filterModeDesc': 'Allow or block codes by sender number or source app',
+        'filter.off': 'Off', 'filter.whitelist': 'Allow only listed sources', 'filter.blacklist': 'Block listed sources',
+        'set.filterNumbers': 'Source List', 'set.filterNumbersDesc': 'One per line: number prefix or app name (e.g. 10086, Taobao)',
         'set.webhook': 'Webhook / Script', 'set.webhookDesc': 'Call a webhook (POST JSON) or run a custom command when a code arrives',
         'set.webhookUrl': 'Webhook URL', 'set.webhookUrlDesc': 'POST JSON with code / app / source / time / from / id',
         'set.scriptPath': 'Command / Script Path', 'set.scriptPathDesc': 'Program to run on arrival (empty = disabled)',
@@ -515,6 +523,8 @@ function fillSettingsForm() {
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setAutoLaunch').checked = !!s.behavior?.autoLaunch;
   $('#setClipboardSync').checked = !!s.behavior?.clipboardSync;
+  $('#setFilterMode').value = s.behavior?.filterMode || 'off';
+  $('#setFilterNumbers').value = s.behavior?.filterNumbers || '';
   $('#setWebhookEnabled').checked = !!s.behavior?.webhookEnabled;
   $('#setWebhookUrl').value = s.behavior?.webhookUrl || '';
   $('#setCommandPath').value = s.behavior?.commandPath || '';
@@ -579,6 +589,8 @@ async function saveSettings() {
       systemNotify: $('#setSystemNotify').checked,
       autoLaunch: $('#setAutoLaunch').checked,
       clipboardSync: $('#setClipboardSync').checked,
+      filterMode: $('#setFilterMode').value || 'off',
+      filterNumbers: $('#setFilterNumbers').value,
       webhookEnabled: $('#setWebhookEnabled').checked,
       webhookUrl: $('#setWebhookUrl').value.trim(),
       commandPath: $('#setCommandPath').value.trim(),

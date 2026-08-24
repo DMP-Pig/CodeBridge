@@ -570,6 +570,13 @@ html[data-theme="light"] .stats-bar { background: rgba(18, 28, 60, 0.1); }
 .field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .field.num { width: 90px; }
 .field.color { width: 46px; height: 34px; padding: 2px; cursor: pointer; }
+.field.area {
+  width: 100%;
+  min-height: 76px;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.5;
+}
 .field.search {
   flex: 1;
   min-width: 0;
@@ -823,7 +830,7 @@ html[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(18, 
 }
 
 /* ============================================================
-   1.0.2beta2 新增：设备在线、验证码倒计时、隐私模式
+   1.0.2beta2 新增：设备在线状态
    ============================================================ */
 /* 设备在线状态 */
 .devices-wrap { margin-top: 14px; }

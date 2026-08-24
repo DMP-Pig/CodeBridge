@@ -56,6 +56,8 @@ const DEFAULT_SETTINGS = {
     autoLaunch: false,      // 开机自启
     clipboardSync: false,   // 发布剪贴板到手机（反向剪贴板）
     speakCode: false,       // 收到验证码语音播报
+    filterMode: 'off',      // 来源过滤器：关闭 | 白名单 | 黑名单
+    filterNumbers: '',      // 过滤列表：号码前缀/应用名，每行一个
   },
   island: {
     baseUrl: 'http://127.0.0.1:9840',
@@ -179,14 +181,14 @@ function getLanIps() {
 }
 
 // ---------------------------------------------------------------- 历史记录
-function addHistory(entry) {
+function addHistory(entry, quiet) {
   autoCleanHistory();
   codeHistory.unshift(entry);
   const max = Math.max(10, settings.ui.keepHistory || 50);
   if (codeHistory.length > max) codeHistory.length = max;
-  saveHistory();
+  if (!quiet) saveHistory();
   // 系统通知
-  if (settings.behavior.systemNotify && Notification.isSupported()) {
+  if (!quiet && settings.behavior.systemNotify && Notification.isSupported()) {
     try {
       new Notification({
         title: APP_NAME,
@@ -393,6 +395,28 @@ function sendJson(res, status, obj) {
   res.end(text);
 }
 
+/**
+ * 来源过滤器：按发件号码 / 来源应用允许或拦截（白名单 / 黑名单）
+ * 列表每行一个，支持号码前缀或应用名；列表为空时不过滤。
+ */
+function sourceFilterPass(source) {
+  const mode = settings.behavior.filterMode || 'off';
+  if (mode === 'off') return { pass: true };
+  const list = String(settings.behavior.filterNumbers || '')
+    .split(/[\s,，;；、]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (list.length === 0) return { pass: true };
+  const s = String(source || '').trim();
+  const norm = (x) => x.replace(/\s/g, '').toLowerCase();
+  const hit = list.some((item) => {
+    const a = norm(item); const b = norm(s);
+    return a.length > 0 && b.length > 0 && (a.includes(b) || b.includes(a));
+  });
+  if (mode === 'whitelist' && !hit) return { pass: false, reason: 'whitelist' };
+  if (mode === 'blacklist' && hit) return { pass: false, reason: 'blacklist' };
+  return { pass: true };
+}
 async function handleRequest(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
@@ -414,7 +438,16 @@ async function handleRequest(req, res) {
     }
     const code = String(body.code || '').trim();
     if (!code) return sendJson(res, 400, { ok: false, error: '缺少 code 字段' });
+    const filter = sourceFilterPass(String(body.source || ''));
+    if (!filter.pass) {
+      const why = filter.reason === 'whitelist'
+        ? mainT('不在白名单', 'not in whitelist')
+        : mainT('命中黑名单', 'in blacklist');
+      emitToRenderer('action:notice', { kind: 'ok', text: mainT('已拦截验证码（' + why + '）', 'Blocked by source filter (' + why + ')') });
+      return sendJson(res, 200, { ok: true, filtered: true });
+    }
 
+    const quiet = !!(body && body.verify);   // verify mode: no disk write / notify / auto-actions
     const entry = {
       id: crypto.randomUUID(),
       code,
@@ -424,9 +457,9 @@ async function handleRequest(req, res) {
       time: new Date().toISOString(),
     };
     recordDevice(body, req);
-    addHistory(entry);
+    addHistory(entry, quiet);
     emitToRenderer('code:new', entry);
-    handleAutoActions(entry);
+    if (!quiet) handleAutoActions(entry);
     return sendJson(res, 200, { ok: true, id: entry.id });
   }
 
@@ -977,7 +1010,7 @@ async function runVerify() {
   try {
     await new Promise((r) => setTimeout(r, 1500));
     // 推送两条测试验证码
-    const payload = JSON.stringify({ code: '820346', app: '测试短信', source: '13800000000' });
+    const payload = JSON.stringify({ code: '820346', app: '测试短信', source: '13800000000', verify: true });
     await new Promise((resolve) => {
       const req = https.request({
         host: '127.0.0.1',

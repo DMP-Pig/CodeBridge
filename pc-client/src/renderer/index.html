@@ -286,6 +286,24 @@
           </div>
           <label class="switch"><input type="checkbox" id="setClipboardSync" /><span class="track"></span></label>
         </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.filterMode"></div>
+            <div class="set-desc" data-i18n="set.filterModeDesc"></div>
+          </div>
+          <select class="field select" id="setFilterMode">
+            <option value="off" data-i18n="filter.off"></option>
+            <option value="whitelist" data-i18n="filter.whitelist"></option>
+            <option value="blacklist" data-i18n="filter.blacklist"></option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.filterNumbers"></div>
+            <div class="set-desc" data-i18n="set.filterNumbersDesc"></div>
+          </div>
+          <textarea class="field area" id="setFilterNumbers" rows="4"></textarea>
+        </div>
       </section>
 
       <section class="set-group">
