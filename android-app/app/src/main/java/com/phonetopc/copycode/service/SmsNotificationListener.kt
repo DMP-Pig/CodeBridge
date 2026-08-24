@@ -1,5 +1,7 @@
 package com.phonetopc.copycode.service
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,12 +10,14 @@ import android.os.Handler
 import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.phonetopc.copycode.data.ClipboardSyncer
 import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -25,6 +29,38 @@ class SmsNotificationListener : NotificationListenerService() {
     private val recent = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
     private val handler = Handler(Looper.getMainLooper())
     private val heartbeatStarted = AtomicBoolean(false)
+    private val clipboardSyncStarted = AtomicBoolean(false)
+    private val clipboardRev = AtomicLong(0L)
+    private val clipboardRunnable = object : Runnable {
+        override fun run() {
+            try {
+                val s = Settings.get()
+                if (s.clipboardSync && s.isValid() && !s.testMode) {
+                    CodeSender.init(applicationContext)
+                    val host = s.pcHost
+                    val port = s.pcPort
+                    val token = s.token
+                    val lastRev = clipboardRev.get()
+                    Thread {
+                        try {
+                            val res = ClipboardSyncer.poll(host, port, token, lastRev)
+                            if (res.ok && res.rev > lastRev) {
+                                clipboardRev.set(res.rev)
+                                if (res.text.isNotEmpty() && res.text != currentClipboard()) {
+                                    writeClipboard(res.text)
+                                    toastShort("\u5df2\u4ece PC \u540c\u6b65\u526a\u8d34\u677f")
+                                }
+                            }
+                        } catch (_: Exception) {
+                            // 轮\u8be2\u5931\u8d25\u4e0d\u5f71\u54cd\u4e0b\u8f6e
+                        }
+                    }.start()
+                }
+            } catch (_: Exception) {
+            }
+            handler.postDelayed(this, CLIPBOARD_POLL_MS)
+        }
+    }
     private val heartbeatRunnable = object : Runnable {
         override fun run() {
             try {
@@ -53,6 +89,7 @@ class SmsNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         startAsForeground()
+        startClipboardSync()
         startHeartbeat()
     }
 
@@ -80,6 +117,32 @@ class SmsNotificationListener : NotificationListenerService() {
         }
     }
 
+    private fun startClipboardSync() {
+        if (clipboardSyncStarted.compareAndSet(false, true)) {
+            handler.post(clipboardRunnable)
+        }
+    }
+
+    private fun currentClipboard(): String = try {
+        val cm = getSystemService(ClipboardManager::class.java)
+        cm?.primaryClip?.getItemAt(0)?.text?.toString() ?: ""
+    } catch (_: Exception) { "" }
+
+    private fun writeClipboard(text: String) {
+        try {
+            val cm = getSystemService(ClipboardManager::class.java) ?: return
+            cm.setPrimaryClip(ClipData.newPlainText("CodeBridge", text))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun toastShort(msg: String) {
+        try {
+            android.widget.Toast.makeText(applicationContext, msg, android.widget.Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+        }
+    }
+
     private fun startHeartbeat() {
         if (heartbeatStarted.compareAndSet(false, true)) {
             handler.post(heartbeatRunnable)
@@ -88,6 +151,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
     override fun onDestroy() {
         handler.removeCallbacks(heartbeatRunnable)
+        handler.removeCallbacks(clipboardRunnable)
         super.onDestroy()
     }
 
@@ -157,6 +221,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
     companion object {
         private const val HEARTBEAT_MS = 30_000L
+        private const val CLIPBOARD_POLL_MS = 3_000L
         private val SMS_PACKAGES = setOf(
             "com.android.mms",
             "com.android.messaging",

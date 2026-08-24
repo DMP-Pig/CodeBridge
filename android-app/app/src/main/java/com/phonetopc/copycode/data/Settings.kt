@@ -64,6 +64,11 @@ class Settings private constructor(context: Context) {
         get() = sp.getInt(KEY_BUBBLE_SECONDS, 15)
         set(v) = sp.edit().putInt(KEY_BUBBLE_SECONDS, v.coerceIn(5, 120)).apply()
 
+    /** Reverse clipboard: pull PC clipboard to phone */
+    var clipboardSync: Boolean
+        get() = sp.getBoolean(KEY_CLIPBOARD_SYNC, false)
+        set(v) = sp.edit().putBoolean(KEY_CLIPBOARD_SYNC, v).apply()
+
     // ---------------- 多 PC 配置 ----------------
 
     /** 已保存的 PC 配置列表（首次使用时会用旧字段迁移出 1 条） */
@@ -198,6 +203,7 @@ class Settings private constructor(context: Context) {
         const val DEFAULT_PORT = 9841
         private const val KEY_FLOAT_BUBBLE = "float_bubble"
         private const val KEY_BUBBLE_SECONDS = "bubble_seconds"
+        private const val KEY_CLIPBOARD_SYNC = "clipboard_sync"
 
         @Volatile
         private var instance: Settings? = null

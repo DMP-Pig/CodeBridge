@@ -54,6 +54,7 @@ const els = {
   setSystemNotify: $('#setSystemNotify'),
   setWebhookEnabled: $('#setWebhookEnabled'),
   setAutoLaunch: $('#setAutoLaunch'),
+  setClipboardSync: $('#setClipboardSync'),
   setWebhookUrl: $('#setWebhookUrl'),
   setCommandPath: $('#setCommandPath'),
   setCommandArgs: $('#setCommandArgs'),
@@ -146,6 +147,7 @@ const I18N = {
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
         'set.autoLaunch': '开机自启', 'set.autoLaunchDesc': '系统登录时自动启动 CodeBridge 并后台运行',
+        'set.clipboardSync': '同步剪贴板到手机', 'set.clipboardSyncDesc': 'PC 剪贴板变化时自动同步到手机端',
         'set.webhook': 'Webhook / 脚本触发', 'set.webhookDesc': '收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本',
         'set.webhookUrl': 'Webhook 地址', 'set.webhookUrlDesc': 'POST JSON，包含 code / app / source / time / from / id',
         'set.scriptPath': '命令 / 脚本路径', 'set.scriptPathDesc': '收到验证码时执行的程序路径（留空则不执行）',
@@ -216,6 +218,7 @@ const I18N = {
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
         'set.autoLaunch': 'Launch at Login', 'set.autoLaunchDesc': 'Start CodeBridge in the background at system login',
+        'set.clipboardSync': 'Sync Clipboard to Phone', 'set.clipboardSyncDesc': 'Auto-sync PC clipboard changes to the phone',
         'set.webhook': 'Webhook / Script', 'set.webhookDesc': 'Call a webhook (POST JSON) or run a custom command when a code arrives',
         'set.webhookUrl': 'Webhook URL', 'set.webhookUrlDesc': 'POST JSON with code / app / source / time / from / id',
         'set.scriptPath': 'Command / Script Path', 'set.scriptPathDesc': 'Program to run on arrival (empty = disabled)',
@@ -511,6 +514,7 @@ function fillSettingsForm() {
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setAutoLaunch').checked = !!s.behavior?.autoLaunch;
+  $('#setClipboardSync').checked = !!s.behavior?.clipboardSync;
   $('#setWebhookEnabled').checked = !!s.behavior?.webhookEnabled;
   $('#setWebhookUrl').value = s.behavior?.webhookUrl || '';
   $('#setCommandPath').value = s.behavior?.commandPath || '';
@@ -574,6 +578,7 @@ async function saveSettings() {
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,
       autoLaunch: $('#setAutoLaunch').checked,
+      clipboardSync: $('#setClipboardSync').checked,
       webhookEnabled: $('#setWebhookEnabled').checked,
       webhookUrl: $('#setWebhookUrl').value.trim(),
       commandPath: $('#setCommandPath').value.trim(),

@@ -211,6 +211,26 @@ function autoCleanHistory() {
   if (codeHistory.length !== before) saveHistory();
 }
 
+// 反向剪贴板：监听 PC 剪贴板，手机轮询 /api/clipboard 拉取
+let syncedClipboard = '';
+let clipboardSyncRev = Date.now();
+let clipboardWatchTimer = null;
+function startClipboardWatch() {
+  if (clipboardWatchTimer) { clearInterval(clipboardWatchTimer); clipboardWatchTimer = null; }
+  if (!settings.behavior.clipboardSync) return;
+  try { syncedClipboard = clipboard.readText(); } catch { syncedClipboard = ''; }
+  clipboardSyncRev = Date.now();
+  clipboardWatchTimer = setInterval(() => {
+    try {
+      const t = clipboard.readText();
+      if (t !== syncedClipboard) {
+        syncedClipboard = t;
+        clipboardSyncRev = Date.now();
+      }
+    } catch { /* 忽略剪贴板读取失败 */ }
+  }, 1000);
+}
+
 // ---------------------------------------------------------------- 剪贴板
 function copyText(text) {
   clipboard.writeText(text || '');
@@ -421,6 +441,20 @@ async function handleRequest(req, res) {
     }
     recordDevice(body, req);
     return sendJson(res, 200, { ok: true, now: Date.now() });
+  }
+
+  // 反向剪贴板：手机轮询 PC 剪贴板，rev 变化时返回新内容
+  if (req.method === 'GET' && pathname === '/api/clipboard') {
+    if (!checkToken(req, {})) {
+      return sendJson(res, 401, { ok: false, error: 'token 无效' });
+    }
+    const rev = parseInt(url.searchParams.get('rev') || '0', 10) || 0;
+    const changed = clipboardSyncRev !== rev;
+    return sendJson(res, 200, {
+      ok: true,
+      rev: clipboardSyncRev,
+      text: changed ? syncedClipboard : '',
+    });
   }
 
   sendJson(res, 404, { ok: false, error: 'not found' });
@@ -794,6 +828,7 @@ function registerIpc() {
     saveSettings();
     await startServer();
     applyAutoLaunch();
+    startClipboardWatch();
     return settings;
   });
 
@@ -919,6 +954,7 @@ app.whenReady().then(() => {
   autoCleanHistory();
   registerIpc();
   applyAutoLaunch();
+  startClipboardWatch();
   createWindow();
   createTray();
   startServer().catch(() => {});
