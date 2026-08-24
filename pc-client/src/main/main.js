@@ -760,6 +760,24 @@ function createTray() {
   }
 }
 
+// ---------------------------------------------------------------- 开机自启
+function applyAutoLaunch() {
+  // 仅 Windows / macOS 支持登录项
+  if (process.platform !== 'win32' && process.platform !== 'darwin') return;
+  try {
+    const login = {
+      openAtLogin: !!settings.behavior.autoLaunch,
+      openAsHidden: true,
+      path: process.execPath,
+    };
+    // 开发模式下需要传入应用路径，否则会只启动 electron 元程
+    if (!app.isPackaged) login.args = [app.getAppPath()];
+    app.setLoginItemSettings(login);
+  } catch (err) {
+    console.error('设置开机自启失败:', err.message);
+  }
+}
+
 // ---------------------------------------------------------------- IPC
 function registerIpc() {
   ipcMain.handle('app:info', () => ({
@@ -775,6 +793,7 @@ function registerIpc() {
     settings = deepMerge(settings, patch || {});
     saveSettings();
     await startServer();
+    applyAutoLaunch();
     return settings;
   });
 
@@ -899,6 +918,7 @@ app.whenReady().then(() => {
   loadHistory();
   autoCleanHistory();
   registerIpc();
+  applyAutoLaunch();
   createWindow();
   createTray();
   startServer().catch(() => {});
