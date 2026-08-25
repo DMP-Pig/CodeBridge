@@ -4,6 +4,7 @@
     <string name="widget_desc">CodeBridge verification code widget</string>
 
     <string name="qr_align_hint">Align the QR code inside the frame</string>
+    <string name="qr_camera_error">Camera failed to open. Check camera permission and retry</string>
 
     <string name="app_title">CodeBridge</string>
     <string name="app_subtitle">Phone → PC · real-time forwarding over LAN</string>

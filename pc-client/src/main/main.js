@@ -1647,7 +1647,13 @@ function registerIpc() {
   // 扫码配对：生成包含本机地址 / 端口 / Token 的二维码
   ipcMain.handle('pairing:qr', async () => {
     const ips = getLanIps();
-    const host = ips[0] || '127.0.0.1';
+    // getLanIps() 返回 {name,address} 对象数组，二维码里只需 address；
+    // 优先选择局域网网段（10.x / 172.16-31.x / 192.168.x），避免取到虚拟网卡导致手机连不上
+    const lan = ips.find((it) => {
+      const a = String(it.address).split('.').map(Number);
+      return a.length === 4 && (a[0] === 10 || (a[0] === 172 && a[1] >= 16 && a[1] <= 31) || (a[0] === 192 && a[1] === 168));
+    });
+    const host = (lan || ips[0] || {}).address || '127.0.0.1';
     const payload = {
       app: 'CodeBridge',
       name: APP_NAME,

@@ -149,7 +149,9 @@ fun MainScreen() {
                 val obj = JSONObject(text)
                 val h = obj.optString("host").trim()
                 val appTag = obj.optString("app")
-                if (h.isBlank() || (appTag.isNotBlank() && appTag != "CodeBridge")) {
+                // 防御旧版本 PC 二维码：host 必须是有效 IP/主机名，不能是对象序列化出来的字符串
+                val hostInvalid = h.isBlank() || h.startsWith("{") || !h.matches(Regex("[0-9A-Za-z._:,-]+"))
+                if (hostInvalid || (appTag.isNotBlank() && appTag != "CodeBridge")) {
                     throw IllegalArgumentException("not CodeBridge payload")
                 }
                 val p = obj.optInt("port", AppSettings.DEFAULT_PORT).coerceIn(1, 65535)

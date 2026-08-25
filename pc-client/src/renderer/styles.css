@@ -98,8 +98,12 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
 }
+/* 主列整体滚动：子卡片保持自然高度，不被 flex 压缩，内容超高时由主列滚动 */
+.main-col > * { flex: none; }
 
 /* ---------------- 玻璃卡片 ---------------- */
 .glass-card {
@@ -401,9 +405,8 @@ html[data-theme="light"] .clip-row:hover { background: rgba(18, 28, 60, 0.1); }
 }
 .history-title { font-size: 13px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.4px; }
 .history-list {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
+  flex: none;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
   gap: 10px;

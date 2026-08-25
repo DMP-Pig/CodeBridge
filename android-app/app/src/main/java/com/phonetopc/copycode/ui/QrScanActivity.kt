@@ -3,6 +3,7 @@ package com.phonetopc.copycode.ui
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import com.phonetopc.copycode.R
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
@@ -38,7 +39,12 @@ class QrScanActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        barcodeView.resume()
+        try {
+            barcodeView.resume()
+        } catch (e: Exception) {
+            Toast.makeText(this, R.string.qr_camera_error, Toast.LENGTH_LONG).show()
+            finish()
+        }
     }
 
     override fun onPause() {

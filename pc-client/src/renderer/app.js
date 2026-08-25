@@ -224,6 +224,7 @@ const I18N = {
     'history.today': '今天', 'history.yesterday': '昨天', 'history.earlier': '更早', 'history.shareSummary': '复制摘要',
     'stats.reportTitle': '统计报告', 'stats.reportWeek': '周报', 'stats.reportMonth': '月报', 'stats.copyReport': '复制报告', 'stats.reportEmpty': '选择周期生成来源 / 类型汇总', 'stats.reportApps': '来源 TOP', 'stats.reportTypes': '类型分布', 'stats.reportDaily': '每日数量', 'stats.reportNone': '暂无数据', 'stats.reportCopied': '报告已复制',
     'toast.shareSummary': '历史摘要已复制',
+    'toast.qrFail': '二维码生成失败，请重试',
     'drawer.title': '设置',
     'group.lan': '局域网服务', 'group.after': '收到验证码后', 'group.island': 'WinIsland 上岛', 'group.ui': '界面',
     'group.platformTemplates': '平台模板库', 'group.platformTemplatesDesc': '为常见平台预设验证码类型与上岛样式：收到的验证码按来源自动匹配模板',
@@ -341,6 +342,7 @@ const I18N = {
     'history.today': 'Today', 'history.yesterday': 'Yesterday', 'history.earlier': 'Earlier', 'history.shareSummary': 'Copy Summary',
     'stats.reportTitle': 'Statistics Report', 'stats.reportWeek': 'Weekly', 'stats.reportMonth': 'Monthly', 'stats.copyReport': 'Copy Report', 'stats.reportEmpty': 'Pick a period to summarize sources / types', 'stats.reportApps': 'Top sources', 'stats.reportTypes': 'Type distribution', 'stats.reportDaily': 'Per day', 'stats.reportNone': 'No data', 'stats.reportCopied': 'Report copied',
     'toast.shareSummary': 'History summary copied',
+    'toast.qrFail': 'Failed to generate QR code, please retry',
     'drawer.title': 'Settings',
     'group.lan': 'LAN Service', 'group.after': 'After receiving a code', 'group.island': 'WinIsland Island', 'group.ui': 'UI',
     'group.platformTemplates': 'Platform Templates', 'group.platformTemplatesDesc': 'Preset code type & island style per source: incoming codes auto-match templates by app/sender',
@@ -855,13 +857,13 @@ function closeDrawer() {
 async function loadPairQr() {
   try {
     const qr = await api.getPairingQr();
-    if (!qr || !qr.dataUrl) return;
+    if (!qr || !qr.dataUrl) { toast('err', t('toast.qrFail')); return; }
     els.pairQr.src = qr.dataUrl;
     const parts = [];
-    if (qr.ips && qr.ips.length > 1) parts.push(qr.ips.join(' / '));
+    if (qr.ips && qr.ips.length > 1) parts.push(qr.ips.map((i) => (i && i.address) || i).join(' / '));
     parts.push('Token: ' + (qr.payload.token || t('set.tokenPh')));
     els.pairQrHint.textContent = parts.join(' · ');
-  } catch (e) { /* 忽略二维码加载失败 */ }
+  } catch (e) { toast('err', t('toast.qrFail')); }
 }
 
 function fillSettingsForm() {
