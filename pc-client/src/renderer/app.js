@@ -244,7 +244,6 @@ const I18N = {
     'set.copyRestore': '复制后恢复原剪贴板', 'set.copyRestoreDesc': '复制验证码后，过一段时间自动恢复为之前的剪贴板内容',
     'set.copyRestoreSecs': '恢复时间（秒）', 'set.copyRestoreSecsDesc': '复制验证码 N 秒后恢复原剪贴板',
     'set.autoIsland': '自动上岛', 'set.autoIslandDesc': '收到后自动推送到 WinIsland 灵动岛',
-    'set.autoInput': '自动输入', 'set.autoInputDesc': '收到后自动输入到当前焦点所在的输入框',
     'set.autoInputSelected': '选中输入框自动输入', 'set.autoInputSelectedDesc': '收到验证码后，若焦点在输入框上则自动输入',
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
@@ -362,7 +361,6 @@ const I18N = {
     'set.copyRestore': 'Restore Original Clipboard', 'set.copyRestoreDesc': 'Restore previous clipboard content after a delay',
     'set.copyRestoreSecs': 'Restore After (s)', 'set.copyRestoreSecsDesc': 'Seconds before restoring original clipboard',
     'set.autoIsland': 'Auto Island', 'set.autoIslandDesc': 'Push to WinIsland automatically',
-    'set.autoInput': 'Auto Type', 'set.autoInputDesc': 'Type the code into the currently focused input',
     'set.autoInputSelected': 'Type into Selected Input', 'set.autoInputSelectedDesc': 'Auto-type the code when an input box is focused',
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
@@ -877,7 +875,6 @@ function fillSettingsForm() {
   $('#setCopyRestoreEnabled').checked = !!s.behavior?.autoCopyRestoreEnabled;
   syncRestoreSecsEnabled();
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
-  $('#setAutoInput').checked = !!s.behavior?.autoInput;
   $('#setAutoInputSelected').checked = !!s.behavior?.autoInputSelected;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
@@ -1090,7 +1087,6 @@ async function saveSettings() {
       autoCopyRestoreEnabled: $('#setCopyRestoreEnabled').checked,
       autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
-      autoInput: $('#setAutoInput').checked,
       autoInputSelected: $('#setAutoInputSelected').checked,
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,

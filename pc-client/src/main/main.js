@@ -49,7 +49,6 @@ const DEFAULT_SETTINGS = {
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
     systemNotifyActions: true, // 系统通知带「复制 / 上岛 / 忽略」按钮
-    autoInput: false,       // 收到验证码自动输入到当前焦点输入框
     autoInputSelected: false, // 收到验证码后，若焦点在输入框上则自动输入
     webhookEnabled: false,  // 验证码到达时调用 Webhook
     webhookUrl: '',         // Webhook URL（POST JSON）
@@ -622,7 +621,7 @@ async function ingestCode(body, remoteAddr) {
   addHistory(entry, quiet);
   emitToRenderer('code:new', entry);
   if (!quiet && !cacheSent) showFloating(entry);
-  if (!quiet && !cacheSent) handleAutoActions(entry);
+  if (!quiet) handleAutoActions(entry);
   statReceived++;
   if (body.relayed) statRelayMsg++;
   return { status: 200, body: { ok: true, id: entry.id } };
@@ -901,12 +900,57 @@ function hasSelectedInput(cb) {
       '$ErrorActionPreference = "SilentlyContinue"',
       'Add-Type -AssemblyName UIAutomationClient',
       'Add-Type -AssemblyName UIAutomationTypes',
+      'Add-Type -AssemblyName System.Drawing',
+      '$yes = $false',
       'try {',
       '  $f = [System.Windows.Automation.AutomationElement]::FocusedElement',
-      '  if ($null -eq $f) { Write-Output "NO"; exit }',
-      '  $ct = $f.Current.ControlType.ProgrammaticName',
-      '  if ($ct -match "Edit|Document") { Write-Output "YES" } else { Write-Output "NO" }',
-      '} catch { Write-Output "NO" }',
+      '  if ($null -ne $f) {',
+      '    $ct = $f.Current.ControlType.ProgrammaticName',
+      '    if ($ct -match "Edit|Document") { $yes = $true }',
+      '  }',
+      '} catch { }',
+      'if (-not $yes) {',
+      '  Add-Type @"',
+      '  using System;',
+      '  using System.Runtime.InteropServices;',
+      '  using System.Text;',
+      '  public struct GUITHREADINFO {',
+      '    public int cbSize;',
+      '    public uint flags;',
+      '    public IntPtr hwndActive;',
+      '    public IntPtr hwndFocus;',
+      '    public IntPtr hwndCapture;',
+      '    public IntPtr hwndMenuOwner;',
+      '    public IntPtr hwndMoveSize;',
+      '    public IntPtr hwndCaret;',
+      '    public System.Drawing.Rectangle rcCaret;',
+      '  }',
+      '  public class Win32UI {',
+      '    [DllImport("user32.dll")] public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);',
+      '    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+      '    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);',
+      '    [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);',
+      '  }',
+      '"@',
+      '  try {',
+      '    $fg = [Win32UI]::GetForegroundWindow()',
+      '    if ($fg -ne [IntPtr]::Zero) {',
+      '      $procId = 0',
+      '      $tid = [Win32UI]::GetWindowThreadProcessId($fg, [ref]$procId)',
+      '      $gui = New-Object GUITHREADINFO',
+      '      $gui.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($gui)',
+      '      if ([Win32UI]::GetGUIThreadInfo($tid, [ref]$gui)) {',
+      '        if ($gui.hwndFocus -ne [IntPtr]::Zero) {',
+      '          $sb = New-Object System.Text.StringBuilder 256',
+      '          [void][Win32UI]::GetClassName($gui.hwndFocus, $sb, 256)',
+      '          $cls = $sb.ToString()',
+      '          if ($cls -match "Edit|RichEdit|TextBox|Document|Input") { $yes = $true }',
+      '        }',
+      '      }',
+      '    }',
+      '  } catch { }',
+      '}',
+      'if ($yes) { Write-Output "YES" } else { Write-Output "NO" }',
     ].join('\n');
     try {
       fs.writeFileSync(psFile, '\ufeff' + script, 'utf16le');
@@ -954,13 +998,6 @@ function handleAutoActions(entry) {
     pushToIsland(entry)
       .then(() => emitToRenderer('action:notice', { kind: 'island', text: mainT('已自动上岛', 'Auto-pushed to island') }))
       .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: err.message }));
-  }
-  // 自动输入到当前焦点输入框（延迟片刻，避免打断用户当前操作）
-  if (settings.behavior.autoInput) {
-    setTimeout(() => {
-      simulateTyping(entry.code);
-      emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
-    }, 600);
   }
   // 选中输入框自动输入：先检测焦点是否在可编辑输入框上，是才输入
   if (settings.behavior.autoInputSelected) {
