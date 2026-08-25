@@ -8,10 +8,13 @@ import android.os.Handler
 import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import com.phonetopc.copycode.data.CodeClassifier
 import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
+import com.phonetopc.copycode.data.CodeValidity
 import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
+import com.phonetopc.copycode.R
 import com.phonetopc.copycode.widget.CodeWidgetProvider
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
@@ -33,7 +36,11 @@ class SmsNotificationListener : NotificationListenerService() {
                 if (s.autoSend && s.isValid() && !s.testMode) {
                     CodeSender.init(applicationContext)
                     Thread {
-                        CodeSender.heartbeat(s.pcHost, s.pcPort, s.token)
+                        val hb = CodeSender.heartbeat(s.pcHost, s.pcPort, s.token)
+                        if (hb.ok) {
+                            // 心跳成功 = 已连上 PC，补发断线期间缓存的验证码
+                            CodeSender.flushCache(s.pcHost, s.pcPort, s.token)
+                        }
                     }.start()
                 }
             } catch (_: Exception) {
@@ -63,15 +70,15 @@ class SmsNotificationListener : NotificationListenerService() {
             val channelId = "codebridge_listener"
             if (Build.VERSION.SDK_INT >= 26) {
                 val chan = NotificationChannel(
-                    channelId, "验证码桥接监听",
+                    channelId, getString(R.string.channel_listener_name),
                     NotificationManager.IMPORTANCE_LOW,
-                ).apply { description = "在后台监听短信验证码并转发到 PC" }
+                ).apply { description = getString(R.string.channel_listener_desc) }
                 getSystemService(NotificationManager::class.java).createNotificationChannel(chan)
             }
             val notif = Notification.Builder(this, channelId)
                 .setSmallIcon(android.R.drawable.stat_notify_sync)
-                .setContentTitle("CodeBridge 正在后台运行")
-                .setContentText("收到短信验证码将自动转发到 PC")
+                .setContentTitle(getString(R.string.notif_listener_title))
+                .setContentText(getString(R.string.notif_listener_text))
                 .setOngoing(true)
                 .setCategory(Notification.CATEGORY_SERVICE)
                 .build()
@@ -125,14 +132,15 @@ class SmsNotificationListener : NotificationListenerService() {
         CodeWidgetProvider.notifyNewCode(applicationContext, code, friendlyAppName(sbn.packageName))
 
         val source = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: sbn.packageName
+        val expireSeconds = CodeValidity.parseExpireSeconds(full)
+        val codeType = CodeClassifier.classify(full)
         Thread {
-            val result = CodeSender.send(
-                host = settings.pcHost,
-                port = settings.pcPort,
-                token = settings.token,
+            val result = CodeSender.sendToAll(
                 code = code,
                 app = friendlyAppName(sbn.packageName),
                 source = source,
+                expireSeconds = expireSeconds,
+                codeType = codeType,
             )
             if (!result.ok) {
                 // 失败后清除去重，允许重试
@@ -149,11 +157,11 @@ class SmsNotificationListener : NotificationListenerService() {
     }
 
     private fun friendlyAppName(pkg: String): String = when (pkg) {
-        "com.android.mms", "com.google.android.apps.messaging", "com.android.messaging" -> "短信"
-        "com.tencent.mm" -> "微信"
-        "com.tencent.mobileqq" -> "QQ"
-        "com.alibaba.android.rimet" -> "钉钉"
-        "com.ss.android.lark" -> "飞书"
+        "com.android.mms", "com.google.android.apps.messaging", "com.android.messaging" -> getString(R.string.app_sms)
+        "com.tencent.mm" -> getString(R.string.app_wechat)
+        "com.tencent.mobileqq" -> getString(R.string.app_qq)
+        "com.alibaba.android.rimet" -> getString(R.string.app_dingtalk)
+        "com.ss.android.lark" -> getString(R.string.app_lark)
         else -> pkg.substringAfterLast('.').ifBlank { pkg }
     }
 

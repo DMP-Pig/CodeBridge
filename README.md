@@ -18,6 +18,11 @@ When your phone receives an SMS verification code, CodeBridge forwards it to you
 - End-to-end TLS encryption (HTTPS + certificate pinning) / 验证码 HTTPS 加密传输（PC 自签证书 + 手机端证书固定，防局域网窃听）
 - Auto-type the code into a focused input after receiving / 收到验证码后自动输入到当前焦点输入框
 - Auto-search PC clients on LAN, multi-PC profiles, QR-code pairing / 自动搜索局域网 PC 客户端、多 PC 配置保存切换、二维码扫码配对
+- Push codes to **all configured PCs** at once (toggleable) / 多 PC 推送：同时推送至所有已配置 PC（可开关）
+- Code-type recognition (login / payment / register / unlock / other) with per-type island styling / 验证码类型识别（登录/支付/注册/解锁）上岛样式与单独项设置
+- Platform template library (Taobao / Alipay / WeChat / banks / Steam / Weibo) / 平台模板库（淘宝/支付宝/微信/银行/Steam/微博）
+- Connection health panel with live status / 连接健康面板（实时状态）
+- History grouped by day (today / yesterday / earlier), weekly & monthly reports, one-click summary sharing / 历史按天分组（今日/昨天/更早）、周报/月报统计、一键复制摘要分享
 - Background survival: Android foreground service / PC system tray / 后台保活：Android 前台服务、PC 最小化到系统托盘
 - Statistics panel, clipboard history, Web console, desktop widget / 统计面板、剪贴板历史、Web 控制台、手机桌面小组件
 - Desktop clients for Windows / macOS / Linux, mobile client as Android APK / PC 端支持 Windows / macOS / Linux，手机端为 Android APK
@@ -73,8 +78,15 @@ PC 端「上岛」会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9
 
 ## Version / 版本
 
-Current version: `1.0.2` (official release). Beta builds stay local only; official releases are published to GitHub.
-当前版本：`1.0.2`（正式版）。Beta 版本仅本地保留，正式版上传 GitHub。
+Current version: `1.0.3beta1` (local beta). Beta builds stay local only; official releases are published to GitHub.
+当前版本：`1.0.3beta1`（本地 Beta）。Beta 版本仅本地保留，正式版上传 GitHub。
+
+### 1.0.3beta1
+- 多 PC 推送：同时推送至所有已配置 PC，可在手机端设置中开关
+- 连接健康面板、验证码类型上岛样式、平台模板库
+- 历史按天分组（今日/昨天/更早）、周报/月报、历史摘要分享
+- 引导选中输入框后自动输入验证码、PC 反向剪贴板已移除
+
 
 ## License / 许可
 

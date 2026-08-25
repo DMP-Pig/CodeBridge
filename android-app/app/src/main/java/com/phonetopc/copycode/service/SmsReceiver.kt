@@ -4,10 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Telephony
+import com.phonetopc.copycode.data.CodeClassifier
 import com.phonetopc.copycode.data.CodeExtractor
 import com.phonetopc.copycode.data.CodeSender
+import com.phonetopc.copycode.data.CodeValidity
 import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
+import com.phonetopc.copycode.R
 import com.phonetopc.copycode.widget.CodeWidgetProvider
 
 /**
@@ -29,18 +32,21 @@ class SmsReceiver : BroadcastReceiver() {
         if (body.isBlank()) return
 
         val code = CodeExtractor.extract(body, settings.customRegex) ?: return
-        CodeBubble.show(context, code, "\u77ed\u4fe1")
-        CodeWidgetProvider.notifyNewCode(context, code, "\u77ed\u4fe1")
+        CodeBubble.show(context, code, context.getString(R.string.app_sms))
+        CodeWidgetProvider.notifyNewCode(context, code, context.getString(R.string.app_sms))
+
+        // 有效期与类型识别：随 /api/code 一并上报给 PC 端
+        val expireSeconds = CodeValidity.parseExpireSeconds(body)
+        val codeType = CodeClassifier.classify(body)
 
         val result = goAsync()
         Thread {
-            CodeSender.send(
-                host = settings.pcHost,
-                port = settings.pcPort,
-                token = settings.token,
+            CodeSender.sendToAll(
                 code = code,
-                app = "短信",
+                app = context.getString(R.string.app_sms),
                 source = sender,
+                expireSeconds = expireSeconds,
+                codeType = codeType,
             )
             result.finish()
         }.start()

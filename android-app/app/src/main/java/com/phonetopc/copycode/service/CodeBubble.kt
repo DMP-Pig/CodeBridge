@@ -16,6 +16,7 @@ import android.view.WindowManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import com.phonetopc.copycode.R
 import com.phonetopc.copycode.data.Settings as AppSettings
 
 /**
@@ -75,9 +76,9 @@ object CodeBubble {
             }
         }
         codeTextView?.text = code
-        metaTextView?.text = if (app.isBlank()) "" else "\u6765\u81ea " + app
+        metaTextView?.text = if (app.isBlank()) "" else context.getString(R.string.bubble_from, app)
         metaTextView?.visibility = if (app.isBlank()) View.GONE else View.VISIBLE
-        hintTextView?.text = "\u70b9\u51fb\u590d\u5236" + " \u00b7 " + bubbleSeconds + "s \u540e\u81ea\u52a8\u6d88\u5931"
+        hintTextView?.text = context.getString(R.string.bubble_hint, bubbleSeconds)
         mainHandler.removeCallbacks(dismissRunnable)
         mainHandler.postDelayed(dismissRunnable, bubbleSeconds * 1000L)
     }
@@ -110,7 +111,7 @@ object CodeBubble {
             }
         }
         val title = TextView(context).apply {
-            text = "\u9a8c\u8bc1\u7801"
+            text = context.getString(R.string.bubble_title)
             setTextColor(Color.WHITE)
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
@@ -185,7 +186,7 @@ object CodeBubble {
         try {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("code", text))
-            Toast.makeText(context, "\u5df2\u590d\u5236", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.copied), Toast.LENGTH_SHORT).show()
         } catch (_: Exception) {
             // ignore
         }

@@ -51,11 +51,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import com.phonetopc.copycode.R
 import com.phonetopc.copycode.data.AutoDiscover
 import com.phonetopc.copycode.data.PcConfig
 import com.phonetopc.copycode.data.FoundPc
@@ -83,8 +85,16 @@ fun MainScreen() {
     var port by remember { mutableStateOf(settings.pcPort.toString()) }
     var token by remember { mutableStateOf(settings.token) }
     var autoSend by remember { mutableStateOf(settings.autoSend) }
+    var bootAutoStart by remember { mutableStateOf(settings.bootAutoStart) }
+    var cacheOffline by remember { mutableStateOf(settings.cacheOffline) }
+    var pushAll by remember { mutableStateOf(settings.pushToAll) }
+    var relayEnabled by remember { mutableStateOf(settings.relayEnabled) }
+    var relayUrl by remember { mutableStateOf(settings.relayUrl) }
+    var relayRoom by remember { mutableStateOf(settings.relayRoom) }
+    var relayToken by remember { mutableStateOf(settings.relayToken) }
+    var e2eKey by remember { mutableStateOf(settings.e2eKey) }
     var customRegex by remember { mutableStateOf(settings.customRegex) }
-    var statusMsg by remember { mutableStateOf("就绪") }
+    var statusMsg by remember { mutableStateOf(context.getString(R.string.status_ready)) }
     var statusOk by remember { mutableStateOf(true) }
     var foundHosts by remember { mutableStateOf<List<FoundPc>?>(null) }
     var lastSearchPort by remember { mutableStateOf(AppSettings.DEFAULT_PORT) }
@@ -131,7 +141,7 @@ fun MainScreen() {
         if (result.resultCode == Activity.RESULT_OK) {
             val text = result.data?.getStringExtra(QrScanActivity.EXTRA_RESULT)
             if (text.isNullOrBlank()) {
-                statusMsg = "未识别到二维码"
+                statusMsg = context.getString(R.string.status_qr_not_found)
                 statusOk = false
                 return@rememberLauncherForActivityResult
             }
@@ -150,14 +160,14 @@ fun MainScreen() {
                 settings.applyActive(h, p, tk)
                 configs = settings.pcConfigs()
                 activeIdx = settings.activeIndex()
-                statusMsg = "扫码配对成功：$h:$p"
+                statusMsg = context.getString(R.string.status_qr_ok, "$h:$p")
                 statusOk = true
             } catch (e: Exception) {
-                statusMsg = "二维码内容无效，请扫描 CodeBridge 配对码"
+                statusMsg = context.getString(R.string.status_qr_invalid)
                 statusOk = false
             }
         } else {
-            statusMsg = "已取消扫码"
+            statusMsg = context.getString(R.string.status_qr_canceled)
             statusOk = false
         }
     }
@@ -168,7 +178,7 @@ fun MainScreen() {
         if (granted) {
             scanLauncher.launch(Intent(context, QrScanActivity::class.java))
         } else {
-            statusMsg = "需要相机权限才能扫码配对"
+            statusMsg = context.getString(R.string.status_camera_needed)
             statusOk = false
         }
     }
@@ -255,18 +265,18 @@ fun MainScreen() {
             // 标题
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("验证码桥接", color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-                    Text("手机 → PC · 局域网实时转发", color = TextFaint, fontSize = 13.sp)
+                    Text(stringResource(R.string.app_title), color = TextPrimary, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.app_subtitle), color = TextFaint, fontSize = 13.sp)
                 }
                 GlassPill(
-                    text = if (listenerEnabled) "监听中" else "未监听",
+                    text = stringResource(if (listenerEnabled) R.string.status_listening else R.string.status_not_listening),
                     color = if (listenerEnabled) Ok else Warn,
                 )
             }
 
             // 服务配置卡片
             GlassCard {
-                CardHeader(Icons.Default.Settings, "PC 接收端")
+                CardHeader(Icons.Default.Settings, stringResource(R.string.card_pc_receiver))
 
                 // 多 PC 配置：切换 / 添加 / 删除
                 Row(
@@ -291,13 +301,13 @@ fun MainScreen() {
                                     host = settings.pcHost
                                     port = settings.pcPort.toString()
                                     token = settings.token
-                                    statusMsg = "已切换到 ${if (cfg.name.isNotBlank()) cfg.name else cfg.host}"
+                                    statusMsg = context.getString(R.string.status_switched, if (cfg.name.isNotBlank()) cfg.name else cfg.host)
                                     statusOk = true
                                 }
                                 .padding(horizontal = 12.dp, vertical = 7.dp),
                         ) {
                             Text(
-                                text = if (cfg.name.isNotBlank()) cfg.name else (cfg.host.ifBlank { "未命名 PC" }),
+                                text = if (cfg.name.isNotBlank()) cfg.name else (cfg.host.ifBlank { context.getString(R.string.unnamed_pc) }),
                                 color = if (selected) TextPrimary else TextDim,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
@@ -308,13 +318,13 @@ fun MainScreen() {
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassButton(
-                        text = "添加配置",
+                        text = stringResource(R.string.add_config),
                         icon = Icons.Default.Add,
                         modifier = Modifier.weight(1f),
                     ) {
                         val (h, p) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
                         if (h.isBlank()) {
-                            statusMsg = "请先填写 PC 地址"
+                            statusMsg = context.getString(R.string.status_fill_host)
                             statusOk = false
                         } else {
                             settings.addConfig(PcConfig("PC ${configs.size + 1}", h, p, token.trim()))
@@ -323,17 +333,17 @@ fun MainScreen() {
                             host = settings.pcHost
                             port = settings.pcPort.toString()
                             token = settings.token
-                            statusMsg = "已添加新配置"
+                            statusMsg = context.getString(R.string.status_config_added)
                             statusOk = true
                         }
                     }
                     GlassButton(
-                        text = "删除当前",
+                        text = stringResource(R.string.delete_current),
                         icon = Icons.Default.Delete,
                         modifier = Modifier.weight(1f),
                     ) {
                         if (configs.size <= 1) {
-                            statusMsg = "至少保留一个配置"
+                            statusMsg = context.getString(R.string.status_keep_one)
                             statusOk = false
                         } else {
                             val ok = settings.removeActiveConfig()
@@ -342,7 +352,7 @@ fun MainScreen() {
                             host = settings.pcHost
                             port = settings.pcPort.toString()
                             token = settings.token
-                            statusMsg = if (ok) "已删除当前配置" else "至少保留一个配置"
+                            statusMsg = if (ok) context.getString(R.string.status_config_deleted) else context.getString(R.string.status_keep_one)
                             statusOk = ok
                         }
                     }
@@ -353,16 +363,16 @@ fun MainScreen() {
                     GlassTextField(
                         value = host,
                         onValueChange = { host = it },
-                        label = "PC 地址（IP 或主机名）",
+                        label = stringResource(R.string.pc_address_label),
                         placeholder = "192.168.1.100:9841",
                         modifier = Modifier.weight(1f),
                     )
                     GlassButton(
-                        text = "搜索",
+                        text = stringResource(R.string.search),
                         icon = Icons.Default.Search,
                         modifier = Modifier.width(84.dp),
                     ) {
-                        statusMsg = "正在搜索 PC…"
+                        statusMsg = context.getString(R.string.status_searching)
                         statusOk = true
                         scope.launch {
                             val searchPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
@@ -370,16 +380,16 @@ fun MainScreen() {
                                 AutoDiscover.discoverAll(searchPort)
                             }
                             if (foundList.isEmpty()) {
-                                statusMsg = "未找到 PC，请确认手机与电脑在同一网络或已连接 USB"
+                                statusMsg = context.getString(R.string.status_not_found)
                                 statusOk = false
                             } else if (foundList.size == 1) {
                                 applyFoundHost(foundList[0].ip, searchPort)
-                                statusMsg = "已找到 PC：${foundList[0].ip}"
+                                statusMsg = context.getString(R.string.status_found, foundList[0].ip)
                                 statusOk = true
                             } else {
                                 lastSearchPort = searchPort
                                 foundHosts = foundList
-                                statusMsg = "找到 ${foundList.size} 台 PC，请选择"
+                                statusMsg = context.getString(R.string.status_found_multi, foundList.size)
                                 statusOk = true
                             }
                         }
@@ -387,7 +397,7 @@ fun MainScreen() {
                 }
                 Spacer(Modifier.height(8.dp))
                 GlassButton(
-                    text = "扫码配对",
+                    text = stringResource(R.string.qr_pair),
                     icon = Icons.Default.QrCodeScanner,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -403,28 +413,83 @@ fun MainScreen() {
                     GlassTextField(
                         value = port,
                         onValueChange = { v -> port = v.filter { it.isDigit() }.take(5) },
-                        label = "端口",
+                        label = stringResource(R.string.port_label),
                         placeholder = "9841",
                         modifier = Modifier.weight(1f),
                     )
                     GlassTextField(
                         value = token,
                         onValueChange = { token = it },
-                        label = "Token（可留空）",
-                        placeholder = "与 PC 端一致",
+                        label = stringResource(R.string.token_label),
+                        placeholder = stringResource(R.string.token_placeholder),
                         modifier = Modifier.weight(1.6f),
                     )
                 }
                 Spacer(Modifier.height(6.dp))
                 ToggleRow(
-                    title = "自动转发",
-                    desc = "收到验证码后自动发送到 PC",
+                    title = stringResource(R.string.title_auto_forward),
+                    desc = stringResource(R.string.desc_auto_forward),
                     checked = autoSend,
                     onCheckedChange = { autoSend = it },
                 )
                 ToggleRow(
-                    title = "自定义正则（可选）",
-                    desc = "留空使用内置中文短信规则",
+                    title = stringResource(R.string.title_boot_start),
+                    desc = stringResource(R.string.desc_boot_start),
+                    checked = bootAutoStart,
+                    onCheckedChange = { bootAutoStart = it },
+                )
+                ToggleRow(
+                    title = stringResource(R.string.title_cache_offline),
+                    desc = stringResource(R.string.desc_cache_offline),
+                    checked = cacheOffline,
+                    onCheckedChange = { cacheOffline = it },
+                )
+
+                ToggleRow(
+                    title = stringResource(R.string.title_push_all),
+                    desc = stringResource(R.string.desc_push_all),
+                    checked = pushAll,
+                    onCheckedChange = { pushAll = it },
+                )
+                ToggleRow(
+                    title = stringResource(R.string.title_relay),
+                    desc = stringResource(R.string.desc_relay),
+                    checked = relayEnabled,
+                    onCheckedChange = { relayEnabled = it },
+                )
+                if (relayEnabled) {
+                    GlassTextField(
+                        value = relayUrl,
+                        onValueChange = { relayUrl = it },
+                        label = stringResource(R.string.relay_url_label),
+                        placeholder = "https://relay.example.com",
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    GlassTextField(
+                        value = relayRoom,
+                        onValueChange = { relayRoom = it },
+                        label = stringResource(R.string.relay_room_label),
+                        placeholder = "myroom",
+                    )
+                    Spacer(Modifier.height(6.dp))
+                    GlassTextField(
+                        value = relayToken,
+                        onValueChange = { relayToken = it },
+                        label = stringResource(R.string.relay_token_label),
+                        placeholder = "123456",
+                    )
+                }
+                if (e2eKey.isNotEmpty() || relayEnabled) {
+                    GlassTextField(
+                        value = e2eKey,
+                        onValueChange = { e2eKey = it },
+                        label = stringResource(R.string.e2e_key_label),
+                        placeholder = "optional",
+                    )
+                }
+                ToggleRow(
+                    title = stringResource(R.string.title_custom_regex),
+                    desc = stringResource(R.string.desc_custom_regex),
                     checked = customRegex.isNotEmpty(),
                     onCheckedChange = { if (it) customRegex = "\\d{6}" else customRegex = "" },
                 )
@@ -432,7 +497,7 @@ fun MainScreen() {
                     GlassTextField(
                         value = customRegex,
                         onValueChange = { customRegex = it },
-                        label = "验证码正则",
+                        label = stringResource(R.string.regex_label),
                         placeholder = "\\d{6}",
                     )
                 }
@@ -440,7 +505,7 @@ fun MainScreen() {
                 foundHosts?.let { hosts ->
                     AlertDialog(
                         onDismissRequest = { foundHosts = null },
-                        title = { Text("选择要推送的 PC", color = TextPrimary) },
+                        title = { Text(stringResource(R.string.select_pc), color = TextPrimary) },
                         text = {
                             Column {
                                 hosts.forEach { pc ->
@@ -451,7 +516,7 @@ fun MainScreen() {
                                             .clickable {
                                                 applyFoundHost(pc.ip, lastSearchPort)
                                                 foundHosts = null
-                                                statusMsg = "已选择 PC：${pc.ip}"
+                                                statusMsg = context.getString(R.string.status_pc_selected, pc.ip)
                                                 statusOk = true
                                             }
                                             .padding(horizontal = 10.dp, vertical = 12.dp),
@@ -481,7 +546,7 @@ fun MainScreen() {
                                         }
                                         Spacer(Modifier.weight(1f))
                                         Text(
-                                            if (pc.isUsb) "USB" else "局域网",
+                                            stringResource(if (pc.isUsb) R.string.usb else R.string.lan),
                                             color = if (pc.isUsb) Warn else Ok,
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.SemiBold,
@@ -491,7 +556,7 @@ fun MainScreen() {
                             }
                         },
                         confirmButton = {
-                            TextButton(onClick = { foundHosts = null }) { Text("取消", color = Accent) }
+                            TextButton(onClick = { foundHosts = null }) { Text(stringResource(R.string.cancel), color = Accent) }
                         },
                         containerColor = Color(0xFF16203A),
                         shape = RoundedCornerShape(18.dp),
@@ -500,7 +565,7 @@ fun MainScreen() {
                 Spacer(Modifier.height(14.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     GlassButton(
-                        text = "保存",
+                        text = stringResource(R.string.save),
                         icon = Icons.Default.Check,
                         accent = true,
                         modifier = Modifier.weight(1f),
@@ -510,16 +575,24 @@ fun MainScreen() {
                         port = savePort.toString()
                         settings.applyActive(saveHost, savePort, token)
                         settings.autoSend = autoSend
+                        settings.bootAutoStart = bootAutoStart
+                        settings.cacheOffline = cacheOffline
+                        settings.pushToAll = pushAll
+                        settings.relayEnabled = relayEnabled
+                        settings.relayUrl = relayUrl
+                        settings.relayRoom = relayRoom
+                        settings.relayToken = relayToken
+                        settings.e2eKey = e2eKey
                         settings.customRegex = customRegex
                         settings.floatBubble = floatBubble
                         settings.bubbleSeconds = bubbleSeconds.toIntOrNull() ?: 15
                         configs = settings.pcConfigs()
                         activeIdx = settings.activeIndex()
-                        statusMsg = if (settings.isValid()) "设置已保存" else "请填写 PC 地址"
+                        statusMsg = if (settings.isValid()) context.getString(R.string.status_saved) else context.getString(R.string.status_fill_host)
                         statusOk = settings.isValid()
                     }
                     GlassButton(
-                        text = "发送测试码",
+                        text = stringResource(R.string.send_test),
                         icon = Icons.Default.Send,
                         modifier = Modifier.weight(1f),
                     ) {
@@ -530,14 +603,14 @@ fun MainScreen() {
                         settings.pcPort = sendPort
                         settings.token = token
                         if (!settings.isValid()) {
-                            statusMsg = "请先填写 PC 地址"
+                            statusMsg = context.getString(R.string.status_fill_host)
                             statusOk = false
                             return@GlassButton
                         }
-                        statusMsg = "发送中…"
+                        statusMsg = context.getString(R.string.status_sending)
                         scope.launch {
                             val result = withContext(Dispatchers.IO) {
-                                CodeSender.send(settings.pcHost, settings.pcPort, settings.token, "123456", "测试", "0000")
+                                CodeSender.sendToAll("123456", context.getString(R.string.test_app), "0000")
                             }
                             statusMsg = result.message
                             statusOk = result.ok
@@ -555,18 +628,18 @@ fun MainScreen() {
 
             // 权限卡片
             GlassCard {
-                CardHeader(Icons.Default.Notifications, "权限与监听")
+                CardHeader(Icons.Default.Notifications, stringResource(R.string.card_permissions))
                 PermissionRow(
-                    title = "通知使用权",
-                    desc = if (listenerEnabled) "已开启，可读取短信验证码通知" else "用于读取短信验证码通知",
+                    title = stringResource(R.string.notification_access),
+                    desc = stringResource(if (listenerEnabled) R.string.desc_na_enabled else R.string.desc_na_disabled),
                     enabled = listenerEnabled,
                 ) {
                     openNotificationAccessSettings(context)
                 }
                 Spacer(Modifier.height(8.dp))
                 PermissionRow(
-                    title = "短信权限（备用）",
-                    desc = if (smsGranted) "已授予" else "未授予（可选，通知监听足够时可不授）",
+                    title = stringResource(R.string.sms_permission),
+                    desc = stringResource(if (smsGranted) R.string.desc_sms_granted else R.string.desc_sms_denied),
                     enabled = smsGranted,
                 ) {
                     val perms = mutableListOf(android.Manifest.permission.RECEIVE_SMS)
@@ -577,25 +650,25 @@ fun MainScreen() {
 
             // 后台保活卡片
             GlassCard {
-                CardHeader(Icons.Default.PowerSettingsNew, "后台保活")
+                CardHeader(Icons.Default.PowerSettingsNew, stringResource(R.string.card_keepalive))
                 PermissionRow(
-                    title = "忽略电池优化",
-                    desc = if (batteryWhitelisted) "已加入白名单，后台不易被系统回收" else "允许后台驻留，避免收不到验证码",
+                    title = stringResource(R.string.ignore_battery),
+                    desc = stringResource(if (batteryWhitelisted) R.string.desc_battery_whitelisted else R.string.desc_battery_not),
                     enabled = batteryWhitelisted,
                 ) {
                     openBatteryOptimizationSettings(context)
                 }
                 Spacer(Modifier.height(8.dp))
                 PermissionRow(
-                    title = "自启动 / 后台运行",
-                    desc = "在系统设置中允许自启动、后台运行（不同品牌入口不同）",
+                    title = stringResource(R.string.auto_start_row),
+                    desc = stringResource(R.string.desc_auto_start_row),
                     enabled = false,
                 ) {
                     openAppDetailsSettings(context)
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "提示：在最近任务中下拉本应用卡片可锁定；开启「通知使用权」后应用会在后台驻留监听验证码。",
+                    text = stringResource(R.string.tip_keepalive),
                     color = TextDim,
                     fontSize = 12.sp,
                     lineHeight = 18.sp,
@@ -605,18 +678,18 @@ fun MainScreen() {
             // 使用说明
             // Floating bubble settings
             GlassCard {
-                CardHeader(Icons.Default.Notifications, "悬浮气泡")
+                CardHeader(Icons.Default.Notifications, stringResource(R.string.card_bubble))
                 ToggleRow(
-                    title = "悬浮气泡",
-                    desc = "收到验证码后在屏幕上方弹出气泡，点击可复制",
+                    title = stringResource(R.string.float_bubble_title),
+                    desc = stringResource(R.string.desc_float_bubble),
                     checked = floatBubble,
                     onCheckedChange = { floatBubble = it },
                 )
                 if (floatBubble && !overlayGranted) {
                     Spacer(Modifier.height(6.dp))
                     PermissionRow(
-                        title = "悬浮窗权限",
-                        desc = "用于在屏幕上显示验证码气泡",
+                        title = stringResource(R.string.overlay_permission),
+                        desc = stringResource(R.string.desc_overlay),
                         enabled = false,
                     ) {
                         val intent = Intent(
@@ -630,27 +703,24 @@ fun MainScreen() {
                 GlassTextField(
                     value = bubbleSeconds,
                     onValueChange = { v -> bubbleSeconds = v.filter { it.isDigit() }.take(3) },
-                    label = "显示时长（秒）",
+                    label = stringResource(R.string.bubble_seconds_label),
                     placeholder = "15",
                 )
                 Spacer(Modifier.height(10.dp))
                 GlassButton(
-                    text = "测试气泡",
+                    text = stringResource(R.string.test_bubble),
                     icon = Icons.Default.Notifications,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    CodeBubble.show(context, "123456", "测试")
-                    statusMsg = "已弹出测试气泡"
+                    CodeBubble.show(context, "123456", context.getString(R.string.test_app))
+                    statusMsg = context.getString(R.string.status_bubble_shown)
                     statusOk = true
                 }
             }
             GlassCard {
-                CardHeader(Icons.Default.Sms, "使用步骤")
+                CardHeader(Icons.Default.Sms, stringResource(R.string.card_steps))
                 Text(
-                    text = "1. 在 PC 端打开 CodeBridge 设置中的「扫码配对」二维码\n" +
-                        "2. 在本页点「扫码配对」扫一扫（或手动填写地址/端口/Token）\n" +
-                        "3. 开启「通知使用权」，授予短信权限\n" +
-                        "4. 保持「自动转发」开启，收到验证码即自动上送",
+                    text = stringResource(R.string.steps_text),
                     color = TextDim,
                     fontSize = 13.sp,
                     lineHeight = 20.sp,
@@ -790,7 +860,7 @@ private fun PermissionRow(
             Text(desc, color = TextFaint, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
         }
         Text(
-            text = if (enabled) "已开启" else "去开启",
+            text = stringResource(if (enabled) R.string.enabled else R.string.go_enable),
             color = if (enabled) Ok else Accent,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,

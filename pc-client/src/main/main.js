@@ -48,6 +48,7 @@ const DEFAULT_SETTINGS = {
     autoIsland: false,      // 收到验证码自动推送到 WinIsland
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
+    systemNotifyActions: true, // 系统通知带「复制 / 上岛 / 忽略」按钮
     autoInput: false,       // 收到验证码自动输入到当前焦点输入框
     autoInputSelected: false, // 收到验证码后，若焦点在输入框上则自动输入
     webhookEnabled: false,  // 验证码到达时调用 Webhook
@@ -59,6 +60,25 @@ const DEFAULT_SETTINGS = {
     speakCode: false,       // 收到验证码语音播报
     filterMode: 'off',      // 来源过滤器：关闭 | 白名单 | 黑名单
     filterNumbers: '',      // 过滤列表：号码前缀/应用名，每行一个
+    codeExpiryEnabled: true,    // 识别有效期：历史/悬浮窗显示倒计时，过期自动灰显
+    codeDefaultExpirySeconds: 600, // 未识别到有效期时使用的默认秒数（0=不自动过期）
+    dedupeEnabled: true,        // 重复验证码防刷屏：同一验证码短时间内重复收到时合并提示
+    dedupeSeconds: 30,          // 防刷屏时间窗口（秒）
+    relay: {                    // 公网加密中继（跨局域网时使用）
+      enabled: false,           // 是否启用中继
+      url: '',                  // 中继地址，如 https://relay.example.com 或 http://1.2.3.4:9842
+      room: '',                 // 房间名（两端一致，建议随机字符串）
+      token: '',                // 中继密钥（两端一致；只发送其 SHA-256 给中继）
+    },
+    e2eKey: '',                   // 端到端加密密钥（可选）：两端填写相同后，局域网消息 AES-256-GCM 端到端加密
+    platformTemplates: [          // 平台模板库：按来源匹配后应用上岛样式与验证码类型
+      { id: 'tb',     name: '\u6DD8\u5B9D/\u5929\u732B', match: '\u6DD8\u5B9D,\u5929\u732B', icon: '\\uE8C7', titleStyle: '', codeType: 'payment', enabled: true },
+      { id: 'alipay', name: '\u652F\u4ED8\u5B9D',    match: '\u652F\u4ED8\u5B9D',       icon: '\\uE8C7', titleStyle: '', codeType: 'payment', enabled: true },
+      { id: 'wechat', name: '\u5FAE\u4FE1',       match: '\u5FAE\u4FE1',           icon: '\\uE8BD', titleStyle: '', codeType: 'login',   enabled: true },
+      { id: 'bank',   name: '\u94F6\u884C',       match: '\u94F6\u884C,\u62DB\u5546,\u5EFA\u8BBE,\u5DE5\u5546,\u519C\u4E1A,\u4EA4\u901A,\u4E2D\u884C', icon: '\\uE8C7', titleStyle: '', codeType: 'payment', enabled: true },
+      { id: 'steam',  name: 'Steam',      match: 'steam',           icon: '\\uE7FC', titleStyle: '', codeType: 'login',   enabled: true },
+      { id: 'weibo',  name: '\u5FAE\u535A',       match: '\u5FAE\u535A',           icon: '\\uE8D6', titleStyle: '', codeType: 'login',   enabled: true },
+    ],
   },
   island: {
     baseUrl: 'http://127.0.0.1:9840',
@@ -66,6 +86,7 @@ const DEFAULT_SETTINGS = {
     durationSeconds: 30,
     icon: '\\uE8D6',        // 钥匙图标（Segoe MDL2）
     titleStyle: 'code',     // 紧凑标题样式：'code' | 'cn' | 'en'
+    typeBadge: true,        // 上岛标题/正文显示验证码类型徽标
     showAppInBody: true,    // 展开正文是否包含来源应用
     animation: 'slide',     // 上岛动画：default | fade | slide | scale
     clickAction: 'copy',    // 上岛点击行为：copy | type
@@ -78,6 +99,9 @@ const DEFAULT_SETTINGS = {
     clipboardHistoryMax: 100,   // 剪贴板历史保留条数
     theme: 'dark',          // 'dark' | 'light' 深浅色主题
     language: 'zh',         // 'zh' | 'en' 界面语言
+    floatWindow: true,      // 收到验证码时显示置顶悬浮窗
+    floatWindowPosition: 'top-right',  // 悬浮窗位置: top-right | top-left | bottom-right | bottom-left
+    floatWindowSeconds: 10, // 悬浮窗自动隐藏秒数（0=不自动隐藏）
   },
 };
 
@@ -108,6 +132,8 @@ const devices = new Map();   // 设备在线状态：deviceId -> 最近心跳信
 let server = null;
 let mainWindow = null;
 let tray = null;
+let floatingWindow = null;    // 最新验证码置顶悬浮窗
+let floatingHideTimer = null; // 悬浮窗自动隐藏定时器
 let clipboardRestoreTimer = null;   // 剪贴板恢复计时器
 let clipboardRestoreValue = null; // 复制验证码前的剪贴板内容
 let isQuitting = false;           // 用户从托盘主动退出时为 true，允许真正关闭窗口
@@ -189,13 +215,38 @@ function addHistory(entry, quiet) {
   const max = Math.max(10, settings.ui.keepHistory || 50);
   if (codeHistory.length > max) codeHistory.length = max;
   if (!quiet) saveHistory();
-  // 系统通知
-  if (!quiet && settings.behavior.systemNotify && Notification.isSupported()) {
+  // 系统通知（缓存补发条目不打扰）
+  if (!quiet && !entry.cacheSent && settings.behavior.systemNotify && Notification.isSupported()) {
     try {
-      new Notification({
+      const notifOpts = {
         title: APP_NAME,
         body: `${entry.app || mainT('短信', 'SMS')}: ${entry.code}`,
-      }).show();
+      };
+      // 可操作系统通知：直接带「复制 / 上岛 / 忽略」按钮（Windows/macOS 支持）
+      if (settings.behavior.systemNotifyActions) {
+        notifOpts.actions = [
+          { type: 'button', text: mainT('复制', 'Copy') },
+          { type: 'button', text: mainT('上岛', 'Island') },
+          { type: 'button', text: mainT('忽略', 'Ignore') },
+        ];
+        notifOpts.closeButtonText = mainT('关闭', 'Close');
+      }
+      const notif = new Notification(notifOpts);
+      notif.on('action', (_e, index) => {
+        if (index === 0) {
+          copyText(entry.code, 'notify');
+        } else if (index === 1) {
+          pushToIsland(entry).catch(() => {});
+        }
+        try { notif.close(); } catch (_) {}
+      });
+      notif.on('click', () => {
+        try {
+          if (mainWindow && !mainWindow.isDestroyed()) { mainWindow.show(); mainWindow.focus(); }
+          notif.close();
+        } catch (_) {}
+      });
+      notif.show();
     } catch (err) { console.error('系统通知失败:', err); }
   }
 }
@@ -317,24 +368,52 @@ function decodeIconEscape(s) {
 /**
  * 构建上岛卡片载荷（单行、不拓宽灵动岛）。
  */
+// 楠岃瘉鐮佺被鍨嬪厓淇℃伅锛氭爣棰樻爣绛撅紙鍗曡缁存寔鐭€佷笉鎷嗗姬宀涘锛?
+const CODE_TYPES = {
+  login:    { zh: '\u767b\u5f55', en: 'Login', icon: '\uE8D6' },
+  register:    { zh: '\u6ce8\u518c', en: 'Register', icon: '\uE710' },
+  payment:    { zh: '\u652f\u4ed8', en: 'Payment', icon: '\uE8C7' },
+  unlock:    { zh: '\u89e3\u9501', en: 'Unlock', icon: '\uE785' },
+  other:    { zh: '\u9a8c\u8bc1', en: 'Code', icon: '\uE8D6' },
+};
+function codeTypeMeta(ct) {
+  const k = String(ct || '').toLowerCase();
+  return CODE_TYPES[k] || null;
+}
+
 function buildIslandPayload(entry) {
-  // 紧凑标题样式（保持单行、不拓宽灵动岛）
-  const style = settings.island.titleStyle || 'code';
+  // 紧凑标题样式（保持单行、不撑宽灵动岛）
+  const isEn = !!(settings.ui && settings.ui.language === 'en');
+  const tpl = entry.platform || {};
+  const tmeta = codeTypeMeta(entry.codeType);
+  const typeOn = settings.island.typeBadge !== false && !!tmeta;
+  const style = tpl.titleStyle || settings.island.titleStyle || 'code';
   const codeStr = `${entry.code}`;
   let title = codeStr;
-  if (style === 'cn') title = `验证码 ${codeStr}`;
-  else if (style === 'en') title = `Code ${codeStr}`;
+  if (typeOn) {
+    const lb = isEn ? tmeta.en : tmeta.zh;
+    if (style === 'cn') title = lb + (isEn ? ' code' : '验证码') + ' ' + codeStr;
+    else if (style === 'en') title = lb + ' code ' + codeStr;
+    else title = lb + ' ' + codeStr;
+  } else if (style === 'cn') title = (isEn ? 'Code' : '验证码') + ' ' + codeStr;
+  else if (style === 'en') title = 'Code ' + codeStr;
   // 展开态正文：来源应用等信息（可关闭）
   const bodyParts = [];
   if (settings.island.showAppInBody !== false) {
+    if (typeOn) bodyParts.push(isEn ? (tmeta.en + ' code') : (tmeta.zh + '验证码'));
     if (entry.app) bodyParts.push(`来自 ${entry.app}`);
     if (entry.source) bodyParts.push(entry.source);
   }
-  const body = bodyParts.length ? bodyParts.join(' · ') : '验证码';
+  const body = bodyParts.length ? bodyParts.join(' · ') : (isEn ? 'Code' : '验证码');
   return {
     title,                             // 紧凑标题（单行）
     body,                              // 展开态正文（单行）
-    icon: decodeIconEscape(settings.island.icon) || '\uE8D6',
+    icon: (() => {
+      const customIcon = decodeIconEscape(settings.island.icon) || '';
+      if (tpl.icon) return (customIcon && customIcon !== '\uE8D6') ? customIcon : tpl.icon;
+      if (customIcon && customIcon !== '\uE8D6') return customIcon;
+      return typeOn ? (tmeta.icon || '\uE8D6') : (customIcon || '\uE8D6');
+    })(),
     duration_seconds: Number(settings.island.durationSeconds) || 30,
     id: `phonetopc-${entry.id}`,
     buttons: [
@@ -415,11 +494,13 @@ function readJsonBody(req) {
 }
 
 function checkToken(req, body) {
+  return checkTokenFor(body, req.headers['x-p2p-token']);
+}
+function checkTokenFor(body, headerToken) {
   const expected = settings.server.token || '';
   if (!expected) return true;
-  const header = req.headers['x-p2p-token'];
   const bodyToken = body && body.token;
-  return header === expected || bodyToken === expected;
+  return headerToken === expected || bodyToken === expected;
 }
 
 function sendJson(res, status, obj) {
@@ -450,6 +531,103 @@ function sourceFilterPass(source) {
   if (mode === 'blacklist' && hit) return { pass: false, reason: 'blacklist' };
   return { pass: true };
 }
+/**
+ * 平台模板匹配：按来源 app/发件人模糊匹配模板库，自动应用图标、标题样式与验证码类型。 */
+function applyPlatformTemplate(entry) {
+  const tpls = Array.isArray(settings.behavior.platformTemplates) ? settings.behavior.platformTemplates : [];
+  const hay = String((entry.app || '') + ' ' + (entry.source || '')).toLowerCase();
+  for (const t of tpls) {
+    if (!t || !t.enabled) continue;
+    const kws = String(t.match || '').split(/[,，]/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+    if (kws.length === 0) continue;
+    if (kws.some((kw) => hay.includes(kw))) {
+      entry.platform = {
+        name: String(t.name || entry.app || ''),
+        icon: String(t.icon || ''),
+        titleStyle: String(t.titleStyle || ''),
+        codeType: String(t.codeType || ''),
+      };
+      if (entry.platform.codeType) entry.codeType = entry.platform.codeType;
+      break;
+    }
+  }
+  return entry;
+}
+
+/**
+ * 处理一条验证码消息（来源：局域网 /api/code 或公网中继）。
+ * 返回 { status, body }，由调用方统一应答。
+ */
+async function ingestCode(body, remoteAddr) {
+  if (!checkTokenFor(body, '')) {
+    return { status: 401, body: { ok: false, error: 'token 无效' } };
+  }
+  // 端到端加密（可选）：手机端用 e2eKey 加密 payload，PC 解密后再处理
+  if (body && body.e2e === true && body.payload) {
+    try {
+      const dec = e2eDecryptPayload(body.payload);
+      body = Object.assign({}, body, dec || {});
+    } catch (err) {
+      return { status: 400, body: { ok: false, error: '端到端解密失败: ' + (err && err.message || err) } };
+    }
+  }
+  const code = String(body.code || '').trim();
+  if (!code) return { status: 400, body: { ok: false, error: '缺少 code 字段' } };
+  const filter = sourceFilterPass(String(body.source || ''));
+  if (!filter.pass) {
+    statBlocked++;
+    const why = filter.reason === 'whitelist'
+      ? mainT('不在白名单', 'not in whitelist')
+      : mainT('在黑名单', 'in blacklist');
+    emitToRenderer('action:notice', { kind: 'ok', text: mainT('已拦截验证码（' + why + '）', 'Blocked by source filter (' + why + ')') });
+    return { status: 200, body: { ok: true, filtered: true } };
+  }
+  const quiet = !!(body && body.verify);   // verify mode: no disk write / notify / auto-actions
+  const cacheSent = body.cacheSent === true || String(body.cacheSent) === 'true';
+  // 去重：同一验证码在去重窗口内重复接收时合并，避免刷屏
+  const dedupeMs = (settings.behavior.dedupeEnabled !== false) ? (Math.max(0, Number(settings.behavior.dedupeSeconds)) || 0) * 1000 : 0;
+  if (dedupeMs > 0) {
+    const dup = codeHistory.find((e) => {
+      if (!e || String(e.code || '') !== code) return false;
+      if ((e.source || '') !== String(body.source || '')) return false;
+      const t = new Date(e.time || '').getTime();
+      return !Number.isNaN(t) && (Date.now() - t) < dedupeMs;
+    });
+    if (dup) {
+      emitToRenderer('action:notice', { kind: 'ok', text: mainT('重复验证码已合并（同一验证码在去重窗口内重新收到）', 'Duplicated code merged (same code received again within the dedupe window)') });
+      return { status: 200, body: { ok: true, deduped: true, id: dup.id } };
+    }
+  }
+  // 有效期识别：优先使用手机端识别结果，未识别时使用 PC 默认值
+  const expireSeconds = Math.max(0, Number(body.expireSeconds) || 0);
+  let expiresAt = 0;
+  if (settings.behavior.codeExpiryEnabled !== false) {
+    const secs = expireSeconds > 0 ? expireSeconds : Math.max(0, Number(settings.behavior.codeDefaultExpirySeconds) || 0);
+    if (secs > 0) expiresAt = Date.now() + secs * 1000;
+  }
+  const entry = {
+    id: crypto.randomUUID(),
+    code,
+    app: String(body.app || '短信').slice(0, 40),
+    source: String(body.source || '').slice(0, 40),
+    from: remoteAddr || '',
+    time: (Number(body.originalTime) > 0 ? new Date(Number(body.originalTime)) : new Date()).toISOString(),
+    cacheSent,
+    expireSeconds,
+    expiresAt,
+    codeType: String(body.codeType || '').slice(0, 20),
+  };
+  recordDevice(body, { socket: { remoteAddress: remoteAddr || '' } });
+  applyPlatformTemplate(entry);
+  addHistory(entry, quiet);
+  emitToRenderer('code:new', entry);
+  if (!quiet && !cacheSent) showFloating(entry);
+  if (!quiet && !cacheSent) handleAutoActions(entry);
+  statReceived++;
+  if (body.relayed) statRelayMsg++;
+  return { status: 200, body: { ok: true, id: entry.id } };
+}
+
 async function handleRequest(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
@@ -495,34 +673,8 @@ async function handleRequest(req, res) {
     try { body = await readJsonBody(req); } catch (err) {
       return sendJson(res, 400, { ok: false, error: err.message });
     }
-    if (!checkToken(req, body)) {
-      return sendJson(res, 401, { ok: false, error: 'token 无效' });
-    }
-    const code = String(body.code || '').trim();
-    if (!code) return sendJson(res, 400, { ok: false, error: '缺少 code 字段' });
-    const filter = sourceFilterPass(String(body.source || ''));
-    if (!filter.pass) {
-      const why = filter.reason === 'whitelist'
-        ? mainT('不在白名单', 'not in whitelist')
-        : mainT('命中黑名单', 'in blacklist');
-      emitToRenderer('action:notice', { kind: 'ok', text: mainT('已拦截验证码（' + why + '）', 'Blocked by source filter (' + why + ')') });
-      return sendJson(res, 200, { ok: true, filtered: true });
-    }
-
-    const quiet = !!(body && body.verify);   // verify mode: no disk write / notify / auto-actions
-    const entry = {
-      id: crypto.randomUUID(),
-      code,
-      app: String(body.app || '短信').slice(0, 40),
-      source: String(body.source || '').slice(0, 40),
-      from: req.socket.remoteAddress || '',
-      time: new Date().toISOString(),
-    };
-    recordDevice(body, req);
-    addHistory(entry, quiet);
-    emitToRenderer('code:new', entry);
-    if (!quiet) handleAutoActions(entry);
-    return sendJson(res, 200, { ok: true, id: entry.id });
+    const result = await ingestCode(body, req.socket.remoteAddress || '');
+    return sendJson(res, result.status, result.body);
   }
 
   // 心跳：手机端定期上报，用于 PC 显示在线状态 / 断线感知
@@ -540,6 +692,116 @@ async function handleRequest(req, res) {
 
   sendJson(res, 404, { ok: false, error: 'not found' });
 }
+// ---------------------------------------------------------------- 公网加密中继客户端
+let relayTimer = null;
+let relayLastId = 0;
+// ----- 连接健康统计 -----
+let serverStartAt = 0;
+let statReceived = 0;
+let statBlocked = 0;
+let statRelayMsg = 0;
+let relayLastOk = 0;
+let relayLastErr = '';
+let relayLastErrAt = 0;
+
+function relayConf() {
+  const r = settings.behavior.relay || {};
+  return {
+    enabled: !!r.enabled,
+    url: String(r.url || '').trim().replace(/\/+$/, ''),
+    room: String(r.room || '').trim(),
+    token: String(r.token || ''),
+  };
+}
+
+/** AES-256-GCM 密钥：两端由「房间名 + 中继密钥」本地派生，中继无法解密 */
+function relayKey(conf) {
+  return crypto.createHash('sha256').update('codebridge:' + conf.room + ':' + conf.token).digest();
+}
+
+/** 发送给中继做认证的 token 哈希（中继不接触密钥明文） */
+function relayTokenHash(conf) {
+  return crypto.createHash('sha256').update(String(conf.token || '')).digest('hex');
+}
+
+function relayDecrypt(conf, msg) {
+  const key = relayKey(conf);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(msg.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(msg.tag, 'base64'));
+  let plain = decipher.update(Buffer.from(msg.ct, 'base64'), null, 'utf8');
+  plain += decipher.final('utf8');
+  return JSON.parse(plain);
+}
+
+function e2eDecryptPayload(payload) {
+  const key = String(settings.behavior.e2eKey || '');
+  if (!key) throw new Error('未配置端到端加密密钥');
+  if (!payload || !payload.iv || !payload.ct || !payload.tag) throw new Error('payload 不完整');
+  const k = crypto.createHash('sha256').update('codebridge:e2e:' + key).digest();
+  const decipher = crypto.createDecipheriv('aes-256-gcm', k, Buffer.from(payload.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(payload.tag, 'base64'));
+  let plain = decipher.update(Buffer.from(payload.ct, 'base64'), null, 'utf8');
+  plain += decipher.final('utf8');
+  return JSON.parse(plain);
+}
+
+async function relayPost(conf, path, body) {
+  const res = await fetch(conf.url + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let errText = '';
+    try { errText = await res.text(); } catch (_) {}
+    throw new Error('relay HTTP ' + res.status + ' ' + errText.slice(0, 120));
+  }
+  return res.json();
+}
+
+async function relayPullOnce() {
+  const conf = relayConf();
+  if (!conf.enabled || !conf.url || !conf.room || !conf.token) return;
+  try {
+    const data = await relayPost(conf, '/relay/pull', {
+      room: conf.room,
+      tokenHash: relayTokenHash(conf),
+      lastId: relayLastId,
+    });
+    if (data && data.ok && Array.isArray(data.msgs)) {
+      relayLastId = Math.max(relayLastId, Number(data.lastId) || 0);
+      relayLastOk = Date.now();
+      for (const msg of data.msgs) {
+        try {
+          const body = relayDecrypt(conf, msg);
+          body.relayed = true;
+          await ingestCode(body, 'relay');
+        } catch (err) {
+          console.error('中继消息解密/处理失败:', err.message);
+        }
+      }
+    }
+  } catch (err) {
+    relayLastErr = (err && err.message) || String(err);
+    relayLastErrAt = Date.now();
+    // 中继不可达：静默，下轮重试
+    if (VERIFY) console.error('relay pull error:', err.message);
+  }
+}
+
+function startRelayClient() {
+  stopRelayClient();
+  const conf = relayConf();
+  if (!conf.enabled || !conf.url || !conf.room || !conf.token) return;
+  relayLastId = 0; // 重启后从头拉取（中继保留 24h）
+  relayPullOnce().catch(() => {});
+  relayTimer = setInterval(() => { relayPullOnce().catch(() => {}); }, 2500);
+}
+
+function stopRelayClient() {
+  if (relayTimer) { clearInterval(relayTimer); relayTimer = null; }
+}
+
 
 /**
  * 模拟键盘输入验证码到当前聚焦的输入框（跨平台）
@@ -802,6 +1064,7 @@ function startServer() {
       reject(err);
     });
     server.listen(settings.server.port, '0.0.0.0', () => {
+      serverStartAt = Date.now();
       const ips = getLanIps();
       emitToRenderer('server:status', { running: true, port: settings.server.port, ips, secure: !!tlsCredentials });
       resolve(true);
@@ -986,11 +1249,122 @@ function createTray() {
     tray.setContextMenu(Menu.buildFromTemplate([
       { label: '打开主界面', click: showMain },
       { type: 'separator' },
+      { label: mainT('开机自启', 'Launch at Startup'), type: 'checkbox', checked: !!settings.behavior.autoLaunch, click: (item) => {
+        settings.behavior.autoLaunch = !!item.checked;
+        saveSettings();
+        applyAutoLaunch();
+      } },
+      { type: 'separator' },
       { label: '退出', click: () => { isQuitting = true; app.quit(); } },
     ]));
     tray.on('click', showMain);
   } catch (err) {
     console.error('创建托盘失败:', err);
+  }
+}
+
+// ---------------------------------------------------------------- 悬浮窗（置顶展示最新验证码）
+function floatingEnabled() {
+  return !!(settings.ui && settings.ui.floatWindow !== false);
+}
+function floatingPosition() {
+  const p = settings.ui && settings.ui.floatWindowPosition;
+  return ['top-right', 'top-left', 'bottom-right', 'bottom-left'].includes(p) ? p : 'top-right';
+}
+function floatingSeconds() {
+  const n = Number(settings.ui && settings.ui.floatWindowSeconds);
+  return Number.isFinite(n) && n > 0 ? n : 0;   // 0 = 不自动隐藏
+}
+function floatingBounds() {
+  const W = 360, H = 96, M = 16;
+  let disp = null;
+  try { disp = pickTargetDisplay(); } catch (err) { disp = null; }
+  let wa = null;
+  try { wa = (disp && disp.workArea) || screen.getPrimaryDisplay().workArea; } catch (err) { wa = null; }
+  if (!wa) wa = { x: 0, y: 0, width: 1920, height: 1080 };
+  const pos = floatingPosition();
+  let x = wa.x + wa.width - W - M;
+  let y = wa.y + M;
+  if (pos.indexOf('left') >= 0) x = wa.x + M;
+  if (pos.indexOf('bottom') >= 0) y = wa.y + wa.height - H - M;
+  return { x: Math.round(x), y: Math.round(y), width: W, height: H };
+}
+function createFloatingWindow() {
+  if (VERIFY || VERIFY_SHOT) return null;
+  if (floatingWindow && !floatingWindow.isDestroyed()) return floatingWindow;
+  const b = floatingBounds();
+  floatingWindow = new BrowserWindow({
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    focusable: false,
+    hasShadow: false,
+    fullscreenable: false,
+    maximizable: false,
+    minimizable: false,
+    show: false,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+  try { floatingWindow.setAlwaysOnTop(true, 'screen-saver'); } catch (err) { floatingWindow.setAlwaysOnTop(true); }
+  floatingWindow.loadFile(path.join(__dirname, '..', 'renderer', 'floating.html'));
+  floatingWindow.once('ready-to-show', () => {
+    if (floatingWindow && !floatingWindow.isDestroyed()) floatingWindow.showInactive();
+  });
+  floatingWindow.on('closed', () => { floatingWindow = null; });
+  return floatingWindow;
+}
+function updateFloating(entry) {
+  const win = createFloatingWindow();
+  if (!win) return;
+  const payload = Object.assign({}, entry, {
+    uiLang: settings.ui && settings.ui.language === 'en' ? 'en' : 'zh',
+    theme: settings.ui && settings.ui.theme === 'light' ? 'light' : 'dark',
+  });
+  const send = () => {
+    try { if (!win.isDestroyed()) win.webContents.send('floating:new', payload); } catch (err) { /* 忽略 */ }
+  };
+  if (win.webContents.isLoading()) win.webContents.once('did-finish-load', send);
+  else send();
+}
+function showFloating(entry) {
+  if (!floatingEnabled()) return;
+  if (floatingHideTimer) { clearTimeout(floatingHideTimer); floatingHideTimer = null; }
+  updateFloating(entry);
+  const win = floatingWindow;
+  if (win && !win.isDestroyed()) {
+    try {
+      const b = floatingBounds();
+      win.setPosition(b.x, b.y);
+      if (!win.webContents.isLoading()) win.showInactive();
+    } catch (err) { /* 忽略 */ }
+  }
+  const secs = floatingSeconds();
+  if (secs > 0) floatingHideTimer = setTimeout(hideFloating, secs * 1000);
+}
+function hideFloating() {
+  if (floatingHideTimer) { clearTimeout(floatingHideTimer); floatingHideTimer = null; }
+  if (floatingWindow && !floatingWindow.isDestroyed()) floatingWindow.hide();
+}
+function syncFloatingWindow() {
+  if (!floatingEnabled()) { hideFloating(); return; }
+  if (floatingWindow && !floatingWindow.isDestroyed()) {
+    try {
+      const b = floatingBounds();
+      floatingWindow.setPosition(b.x, b.y);
+    } catch (err) { /* 忽略 */ }
   }
 }
 
@@ -1090,8 +1464,10 @@ function registerIpc() {
     settings = deepMerge(settings, patch || {});
     saveSettings();
     await startServer();
+    startRelayClient();
     applyAutoLaunch();
     startClipboardWatch();
+    syncFloatingWindow();
     return settings;
   });
 
@@ -1110,6 +1486,27 @@ function registerIpc() {
   ipcMain.handle('code:list', () => codeHistory);
 
   ipcMain.handle('devices:list', () => devicesToArray());
+
+  ipcMain.handle('health:snapshot', () => {
+    const r = settings.behavior.relay || {};
+    return {
+      startedAt: serverStartAt,
+      uptimeSec: serverStartAt ? Math.round((Date.now() - serverStartAt) / 1000) : 0,
+      port: settings.server.port,
+      received: statReceived,
+      blocked: statBlocked,
+      relayMsg: statRelayMsg,
+      devices: devicesToArray(),
+      relay: {
+        enabled: !!(r.enabled),
+        url: String(r.url || ''),
+        room: String(r.room || ''),
+        lastOk: relayLastOk || 0,
+        lastErr: relayLastErr || '',
+        lastErrAt: relayLastErrAt || 0,
+      },
+    };
+  });
   ipcMain.handle('displays:list', () => getDisplaysBrief());
 
   ipcMain.handle('code:clear', () => { codeHistory = []; saveHistory(); return true; });
@@ -1236,6 +1633,7 @@ function registerIpc() {
     }
   });
 
+  ipcMain.handle('floating:hide', () => { hideFloating(); return true; });
   ipcMain.handle('window:minimize', () => mainWindow && mainWindow.minimize());
   ipcMain.handle('window:maximize', () => {
     if (!mainWindow) return;
@@ -1317,6 +1715,7 @@ app.whenReady().then(() => {
   createWindow();
   createTray();
   startServer().catch(() => {});
+  startRelayClient();
   if (!VERIFY && !VERIFY_SHOT) setTimeout(checkForUpdates, 4000);
   if (VERIFY || VERIFY_SHOT) runVerify();
   app.on('activate', () => {
@@ -1328,16 +1727,18 @@ app.whenReady().then(() => {
 
 // 关闭主界面后继续后台运行：所有平台都不因窗口关闭而退出（由托盘“退出”真正结束）
 app.on('window-all-closed', () => { });
-app.on('before-quit', () => { isQuitting = true; });
+app.on('before-quit', () => {
+  isQuitting = true;
+  if (floatingWindow && !floatingWindow.isDestroyed()) floatingWindow.destroy();
+});
 
 
 // ---------------------------------------------------------------- 验证模式（--verify / --screenshot）
 async function runVerify() {
   try {
     await new Promise((r) => setTimeout(r, 1500));
-    // 推送两条测试验证码
-    const payload = JSON.stringify({ code: '820346', app: '测试短信', source: '13800000000', verify: true });
-    await new Promise((resolve) => {
+    // 推送两条测试验证码（第二条同码，用于验证「重复验证码防刷屏」）
+    const pushCode = (payload) => new Promise((resolve) => {
       const req = https.request({
         host: '127.0.0.1',
         port: settings.server.port,
@@ -1345,10 +1746,19 @@ async function runVerify() {
         method: 'POST',
         rejectUnauthorized: false,
         headers: { 'Content-Type': 'application/json' },
-      }, (res) => { res.resume(); res.on('end', resolve); });
-      req.on('error', () => resolve());
+      }, (res) => {
+        let data = '';
+        res.on('data', (c) => { data += c; });
+        res.on('end', () => { try { resolve(JSON.parse(data)); } catch (err) { resolve(null); } });
+      });
+      req.on('error', () => resolve(null));
       req.end(payload);
     });
+    const basePayload = { code: '820346', app: '测试短信', source: '13800000000', codeType: 'login', verify: true };
+    const firstRes = await pushCode(JSON.stringify(basePayload));
+    const secondRes = await pushCode(JSON.stringify(basePayload));
+    const thirdPayload = { code: '965214', app: '\u6dd8\u5b9d', source: '10658888999', verify: true };
+    const thirdRes = await pushCode(JSON.stringify(thirdPayload));
     await new Promise((r) => setTimeout(r, 2500));
     const result = await mainWindow.webContents.executeJavaScript(`(() => {
       const q = (s) => document.querySelector(s);
@@ -1361,6 +1771,21 @@ async function runVerify() {
         historyCards: document.querySelectorAll('.history-card').length,
         ipChips: document.querySelectorAll('.ip-chip').length,
         errors: window.__p2pErrors || [],
+        heroExpiryVisible: q('#heroExpiry') ? !q('#heroExpiry').classList.contains('hidden') : false,
+        heroExpiryText: (q('#heroExpiry')?.textContent || '').trim(),
+        heroTypeText: q('#heroType')?.textContent || '',
+        heroTypeClass: q('#heroType')?.className || '',
+        historyTypeBadges: document.querySelectorAll('.history-type').length,
+        historyExpiryBadges: document.querySelectorAll('.history-expiry').length,
+        expiredCards: document.querySelectorAll('.history-card.expired').length,
+        healthItems: document.querySelectorAll('.health-item').length,
+        healthValues: Array.from(document.querySelectorAll('.health-value')).map((e) => e.textContent),
+        healthHint: q('#healthHint')?.textContent || '',
+        reportBtns: document.querySelectorAll('.report-btns .text-btn').length,
+        reportEmptyText: (q('#reportOutput')?.textContent || '').trim(),
+        groupHeaders: document.querySelectorAll('.history-group').length,
+        shareBtn: !!q('#btnShareSummary'),
+
       };
     })()`);
     // 走真实上岛流程（与点击「上岛」按钮完全一致）
@@ -1376,7 +1801,19 @@ async function runVerify() {
       result.islandSingleLine = !pl.title.includes('\n') && !pl.body.includes('\n');
       result.islandPayload = { title: pl.title, body: pl.body, button: pl.buttons[0].label };
     }
+    if (codeHistory[0]) {
+      const tplPl = buildIslandPayload(codeHistory[0]);
+      result.tpl = {
+        matched: !!codeHistory[0].platform,
+        codeType: codeHistory[0].codeType,
+        name: codeHistory[0].platform && codeHistory[0].platform.name,
+        title: tplPl.title,
+        singleLine: !tplPl.title.includes('\n'),
+        icon: tplPl.icon,
+      };
+    }
     result.islandPush = islandRes;
+    result.dedupeTest = { firstOk: !!(firstRes && firstRes.ok), secondDeduped: !!(secondRes && secondRes.deduped) };
     console.log('VERIFY_RESULT ' + JSON.stringify(result));
     const img = await mainWindow.webContents.capturePage();
     const outPath = VERIFY_SHOT

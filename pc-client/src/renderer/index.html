@@ -75,6 +75,13 @@
           </div>
           <div class="devices-row" id="devicesRow"></div>
         </div>
+        <div class="health-wrap" id="healthWrap">
+          <div class="health-head">
+            <span class="health-title" data-i18n="health.title">连接健康</span>
+            <span class="health-hint" id="healthHint"></span>
+          </div>
+          <div class="health-grid" id="healthGrid"></div>
+        </div>
       </div>
 
       <!-- 最新验证码大卡 -->
@@ -90,9 +97,11 @@
         </div>
         <div class="hero-content hidden" id="heroContent">
           <div class="hero-meta">
+            <span class="hero-type hidden" id="heroType"></span>
             <span class="hero-app" id="heroApp" data-i18n="history.msg.defaultApp">短信</span>
             <span class="hero-source" id="heroSource"></span>
             <span class="hero-time" id="heroTime"></span>
+            <span class="hero-expiry hidden" id="heroExpiry"></span>
           </div>
           <div class="hero-code" id="heroCode">000000</div>
           <div class="hero-actions">
@@ -125,6 +134,17 @@
         <div class="stats-trend" id="statsTrend"></div>
         <div class="stats-dist" data-i18n="stats.dist">今日来源分布</div>
         <div class="stats-apps" id="statsApps"></div>
+        <div class="report-box">
+          <div class="report-head">
+            <span class="stats-dist report-title" data-i18n="stats.reportTitle">统计报告</span>
+            <div class="report-btns">
+              <button class="text-btn" id="btnReportWeek" data-i18n="stats.reportWeek">周报</button>
+              <button class="text-btn" id="btnReportMonth" data-i18n="stats.reportMonth">月报</button>
+              <button class="text-btn" id="btnCopyReport" data-i18n="stats.copyReport">复制报告</button>
+            </div>
+          </div>
+          <div class="report-output" id="reportOutput"></div>
+        </div>
       </div>
 
       <!-- 剪贴板历史 -->
@@ -146,6 +166,7 @@
         <button class="text-btn" id="btnExportCsv" data-i18n="history.exportCsv">导出 CSV</button>
         <button class="text-btn" id="btnExportJson" data-i18n="history.exportJson">导出 JSON</button>
         <button class="text-btn" id="btnImportHistory" data-i18n="history.import">导入</button>
+        <button class="text-btn" id="btnShareSummary" data-i18n="history.shareSummary">复制摘要</button>
       </div>
       <div class="history-list" id="historyList"></div>
     </section>
@@ -195,6 +216,41 @@
         <div class="pair-qr-wrap">
           <img class="pair-qr" id="pairQr" alt="pairing QR" />
           <div class="pair-qr-hint" id="pairQrHint"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.relayEnabled">公网加密中继</div>
+            <div class="set-desc" data-i18n="set.relayEnabledDesc">手机与 PC 不在同一局域网时，通过加密中继转发验证码</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setRelayEnabled" /><span class="track"></span></label>
+        </div>
+        <div class="set-row" id="relayExtraRow" style="display:none">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.relayUrl">中继地址</div>
+            <div class="set-desc" data-i18n="set.relayUrlDesc">需部署 relay-server；如 https://relay.example.com</div>
+          </div>
+          <input class="field" id="setRelayUrl" type="text" placeholder="https://relay.example.com" />
+        </div>
+        <div class="set-row" id="relayExtraRow2" style="display:none">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.relayRoom">房间名</div>
+            <div class="set-desc" data-i18n="set.relayRoomDesc">两端填写相同，建议随机字符串</div>
+          </div>
+          <input class="field" id="setRelayRoom" type="text" placeholder="cb-xxxxxxxx" />
+        </div>
+        <div class="set-row" id="relayExtraRow3" style="display:none">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.relayToken">中继密钥</div>
+            <div class="set-desc" data-i18n="set.relayTokenDesc">两端填写相同；只发送哈希给中继，消息端到端加密</div>
+          </div>
+          <input class="field" id="setRelayToken" type="text" placeholder="************" />
+        </div>
+        <div class="set-row" id="e2eRow">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.e2eKey"></div>
+            <div class="set-desc" data-i18n="set.e2eKeyDesc"></div>
+          </div>
+          <input class="field" id="setE2eKey" type="password" autocomplete="off" placeholder="••••••••" />
         </div>
       </section>
 
@@ -251,6 +307,38 @@
         </div>
         <div class="set-row">
           <div class="set-info">
+            <div class="set-name" data-i18n="set.codeExpiry">有效期识别</div>
+            <div class="set-desc" data-i18n="set.codeExpiryDesc">识别短信中的有效期，历史与悬浮窗显示倒计时，过期自动灰显</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setCodeExpiry" /><span class="track"></span></label>
+        </div>
+        <div id="codeExpiryExtra" style="display:none">
+          <div class="set-row">
+            <div class="set-info">
+              <div class="set-name" data-i18n="set.codeDefaultExpiry">默认有效期（秒）</div>
+              <div class="set-desc" data-i18n="set.codeDefaultExpiryDesc">未识别到有效期时使用的默认秒数（0=不自动过期）</div>
+            </div>
+            <input class="field num" id="setCodeDefaultExpiry" type="number" min="0" max="86400" />
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.dedupe">重复防刷屏</div>
+            <div class="set-desc" data-i18n="set.dedupeDesc">同一验证码短时间内重复收到时合并提示，不重复上岛/复制</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setDedupe" /><span class="track"></span></label>
+        </div>
+        <div id="dedupeExtra" style="display:none">
+          <div class="set-row">
+            <div class="set-info">
+              <div class="set-name" data-i18n="set.dedupeSeconds">防刷屏窗口（秒）</div>
+              <div class="set-desc" data-i18n="set.dedupeSecondsDesc">窗口内相同验证码视为重复（0=关闭）</div>
+            </div>
+            <input class="field num" id="setDedupeSeconds" type="number" min="0" max="3600" />
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
             <div class="set-name" data-i18n="set.webhook">Webhook / 脚本触发</div>
             <div class="set-desc" data-i18n="set.webhookDesc">收到验证码时调用 Webhook（POST JSON）或执行自定义命令/脚本</div>
           </div>
@@ -295,6 +383,39 @@
             <div class="set-desc" data-i18n="set.systemNotifyDesc">收到验证码时发送 Windows/macOS 系统通知</div>
           </div>
           <label class="switch"><input type="checkbox" id="setSystemNotify" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.notifyActions">通知操作按钮</div>
+            <div class="set-desc" data-i18n="set.notifyActionsDesc">系统通知直接带「复制 / 上岛 / 忽略」按钮</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setNotifyActions" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.floatWindow">验证码悬浮窗</div>
+            <div class="set-desc" data-i18n="set.floatWindowDesc">收到验证码时在屏幕角落置顶显示悬浮窗</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setFloatWindow" /><span class="track"></span></label>
+        </div>
+        <div class="set-row" id="floatWindowExtra">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.floatWindowPos">悬浮窗位置</div>
+            <div class="set-desc" data-i18n="set.floatWindowPosDesc">悬浮窗在屏幕中的位置</div>
+          </div>
+          <select class="field select" id="setFloatWindowPos">
+            <option value="top-right" data-i18n="pos.topRight"></option>
+            <option value="top-left" data-i18n="pos.topLeft"></option>
+            <option value="bottom-right" data-i18n="pos.bottomRight"></option>
+            <option value="bottom-left" data-i18n="pos.bottomLeft"></option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.floatWindowSeconds">自动隐藏（秒）</div>
+            <div class="set-desc" data-i18n="set.floatWindowSecondsDesc">显示 N 秒后自动隐藏（0=不自动隐藏）</div>
+          </div>
+          <input class="field num" id="setFloatWindowSeconds" type="number" min="0" max="3600" />
         </div>
         <div class="set-row">
           <div class="set-info">
@@ -387,6 +508,13 @@
         </div>
         <div class="set-row">
           <div class="set-info">
+            <div class="set-name" data-i18n="set.islandTypeBadge">上岛标注验证码类型</div>
+            <div class="set-desc" data-i18n="set.islandTypeBadgeDesc">登录/注册/支付等验证码在上岛卡片标题与正文中标明类型</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="setIslandTypeBadge" /><span class="track"></span></label>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
             <div class="set-name" data-i18n="set.islandIconPreset">图标快捷选择</div>
             <div class="set-desc" data-i18n="set.islandIconPresetDesc">点击填入上方图标输入框</div>
           </div>
@@ -446,6 +574,15 @@
         </div>
         <div class="set-row">
           <button class="glass-btn accent block" id="btnTestIsland" data-i18n="btn.testIsland">测试上岛连接</button>
+        </div>
+      </section>
+
+      <section class="set-group">
+        <h3 class="set-group-title" data-i18n="group.platformTemplates">平台模板库</h3>
+        <div class="set-desc block" data-i18n="group.platformTemplatesDesc">为常见平台预设验证码类型与上岛样式：收到的验证码按来源自动匹配模板</div>
+        <div class="platform-templates" id="platformTemplatesList"></div>
+        <div class="set-row">
+          <button class="glass-btn accent block" id="btnAddPlatformTemplate" data-i18n="btn.addPlatformTemplate">添加模板</button>
         </div>
       </section>
 

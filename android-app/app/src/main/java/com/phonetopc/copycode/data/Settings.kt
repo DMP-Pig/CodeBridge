@@ -43,6 +43,40 @@ class Settings private constructor(context: Context) {
         get() = sp.getBoolean(KEY_AUTO_SEND, true)
         set(v) = sp.edit().putBoolean(KEY_AUTO_SEND, v).apply()
 
+    /** 开机自启：系统启动完成后自动恢复转发 */
+    var bootAutoStart: Boolean
+        get() = sp.getBoolean(KEY_BOOT_AUTO_START, true)
+        set(v) = sp.edit().putBoolean(KEY_BOOT_AUTO_START, v).apply()
+    /** 断线缓存：发送失败时先缓存到本地，恢复连接后自动补发 */
+    var cacheOffline: Boolean
+        get() = sp.getBoolean(KEY_CACHE_OFFLINE, true)
+        set(v) = sp.edit().putBoolean(KEY_CACHE_OFFLINE, v).apply()
+
+    /** 公网加密中继：手机与 PC 不在同一局域网时，经中继转发验证码 */
+    var relayEnabled: Boolean
+        get() = sp.getBoolean(KEY_RELAY_ENABLED, false)
+        set(v) = sp.edit().putBoolean(KEY_RELAY_ENABLED, v).apply()
+
+    /** 中继服务器地址，如 https://relay.example.com */
+    var relayUrl: String
+        get() = sp.getString(KEY_RELAY_URL, "") ?: ""
+        set(v) = sp.edit().putString(KEY_RELAY_URL, v.trim()).apply()
+
+    /** 房间名（两端一致） */
+    var relayRoom: String
+        get() = sp.getString(KEY_RELAY_ROOM, "") ?: ""
+        set(v) = sp.edit().putString(KEY_RELAY_ROOM, v.trim()).apply()
+
+    /** 中继密钥（两端一致；仅发送其 SHA-256 给中继） */
+    var relayToken: String
+        get() = sp.getString(KEY_RELAY_TOKEN, "") ?: ""
+        set(v) = sp.edit().putString(KEY_RELAY_TOKEN, v.trim()).apply()
+
+    /** 端到端加密密钥（可选）：与 PC 端填写相同后，局域网消息 AES-256-GCM 端到端加密 */
+    var e2eKey: String
+        get() = sp.getString(KEY_E2E_KEY, "") ?: ""
+        set(v) = sp.edit().putString(KEY_E2E_KEY, v.trim()).apply()
+
     /** 自定义验证码正则（留空使用内置规则） */
     var customRegex: String
         get() = sp.getString(KEY_REGEX, "") ?: ""
@@ -62,6 +96,11 @@ class Settings private constructor(context: Context) {
     var bubbleSeconds: Int
         get() = sp.getInt(KEY_BUBBLE_SECONDS, 15)
         set(v) = sp.edit().putInt(KEY_BUBBLE_SECONDS, v.coerceIn(5, 120)).apply()
+
+    /** 多 PC 推送：同时推送至所有已配置的 PC 接收端 */
+    var pushToAll: Boolean
+        get() = sp.getBoolean(KEY_PUSH_ALL, true)
+        set(v) = sp.edit().putBoolean(KEY_PUSH_ALL, v).apply()
 
 
     // ---------------- 多 PC 配置 ----------------
@@ -183,7 +222,7 @@ class Settings private constructor(context: Context) {
         sp.edit().putString(KEY_CONFIGS, arr.toString()).apply()
     }
 
-    fun isValid(): Boolean = pcHost.isNotBlank()
+    fun isValid(): Boolean = pcConfigs().any { it.host.isNotBlank() }
 
     companion object {
         private const val PREFS = "p2p_settings"
@@ -191,10 +230,18 @@ class Settings private constructor(context: Context) {
         private const val KEY_PORT = "pc_port"
         private const val KEY_TOKEN = "token"
         private const val KEY_AUTO_SEND = "auto_send"
+        private const val KEY_BOOT_AUTO_START = "boot_auto_start"
+        private const val KEY_CACHE_OFFLINE = "cache_offline"
+        private const val KEY_RELAY_ENABLED = "relay_enabled"
+        private const val KEY_RELAY_URL = "relay_url"
+        private const val KEY_RELAY_ROOM = "relay_room"
+        private const val KEY_RELAY_TOKEN = "relay_token"
+        private const val KEY_E2E_KEY = "e2e_key"
         private const val KEY_REGEX = "code_regex"
         private const val KEY_TEST_MODE = "test_mode"
         private const val KEY_CONFIGS = "pc_configs"
         private const val KEY_ACTIVE = "pc_active"
+        private const val KEY_PUSH_ALL = "push_all"
         const val DEFAULT_PORT = 9841
         private const val KEY_FLOAT_BUBBLE = "float_bubble"
         private const val KEY_BUBBLE_SECONDS = "bubble_seconds"

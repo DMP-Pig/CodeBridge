@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'self'; connect-src 'self'" />
+  <title>CodeBridge</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="floating-body">
+  <div class="floating-card" id="floatCard">
+    <div class="floating-drag" id="floatDragArea">
+      <div class="floating-icon" id="floatIcon">🔑</div>
+      <div class="floating-info">
+        <div class="floating-code" id="floatCode">------</div>
+        <div class="floating-meta" id="floatMeta">等待验证码…</div>
+        <div class="floating-expiry hidden" id="floatExpiry"></div>
+      </div>
+    </div>
+    <div class="floating-actions">
+      <button class="floating-btn" id="floatCopy" title="复制到剪贴板" aria-label="复制到剪贴板">⧉</button>
+      <button class="floating-btn floating-close" id="floatClose" title="隐藏悬浮窗" aria-label="隐藏悬浮窗">✕</button>
+    </div>
+  </div>
+  <script src="floating-window.js"></script>
+</body>
+</html>

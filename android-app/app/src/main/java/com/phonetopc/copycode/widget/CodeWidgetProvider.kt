@@ -33,7 +33,7 @@ class CodeWidgetProvider : AppWidgetProvider() {
                     try {
                         val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         cm.setPrimaryClip(ClipData.newPlainText("CodeBridge", code))
-                        Toast.makeText(context, "\u5df2\u590d\u5236 " + code, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.widget_toast_copied, code), Toast.LENGTH_SHORT).show()
                     } catch (_: Exception) {
                     }
                 }
@@ -65,16 +65,16 @@ class CodeWidgetProvider : AppWidgetProvider() {
         val time = p.getLong(KEY_TIME, 0L)
         views.setTextViewText(R.id.tv_widget_time, fmtTime(time))
         if (code.isBlank()) {
-            views.setTextViewText(R.id.tv_widget_code, "\u7b49\u5f85\u77ed\u4fe1\u9a8c\u8bc1\u7801\u2026")
+            views.setTextViewText(R.id.tv_widget_code, context.getString(R.string.widget_waiting))
             views.setTextColor(R.id.tv_widget_code, 0xFF8FA3BF.toInt())
-            views.setTextViewText(R.id.tv_widget_meta, "\u6536\u5230\u9a8c\u8bc1\u7801\u540e\u81ea\u52a8\u663e\u793a")
+            views.setTextViewText(R.id.tv_widget_meta, context.getString(R.string.widget_meta_empty))
         } else {
             views.setTextViewText(R.id.tv_widget_code, code)
             views.setTextColor(R.id.tv_widget_code, 0xFFFFFFFF.toInt())
-            val meta = if (app.isBlank()) "\u77ed\u4fe1" else app
+            val meta = if (app.isBlank()) context.getString(R.string.app_sms) else app
             views.setTextViewText(R.id.tv_widget_meta, meta + " \u00b7 " + fmtTime(time))
         }
-        views.setTextViewText(R.id.tv_widget_copy, if (copied) "\u5df2\u590d\u5236 \u2713" else "\u590d\u5236")
+        views.setTextViewText(R.id.tv_widget_copy, if (copied) context.getString(R.string.widget_copied) else context.getString(R.string.copy))
         views.setOnClickPendingIntent(R.id.tv_widget_copy, pendingBroadcast(context, ACTION_COPY, 1001))
         views.setOnClickPendingIntent(R.id.widget_root, pendingBroadcast(context, ACTION_COPY, 1002))
         return views

@@ -16,7 +16,7 @@
         android:layout_marginBottom="52dp"
         android:background="#66000000"
         android:padding="8dp"
-        android:text="将二维码对准取景框"
+        android:text="@string/qr_align_hint"
         android:textColor="#FFFFFF"
         android:textSize="15sp" />
 </FrameLayout>
