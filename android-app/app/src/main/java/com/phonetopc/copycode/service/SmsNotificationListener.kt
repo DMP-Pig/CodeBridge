@@ -117,8 +117,8 @@ class SmsNotificationListener : NotificationListenerService() {
         val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
         val full = "$title\n$text\n$bigText"
 
-        // 仅处理可能包含验证码的通知，减少误报
-        if (!looksLikeSms(title, text, bigText, sbn.packageName)) return
+        // 默认仅处理系统短信验证码，减少误报；关闭「仅短信验证码」后才处理应用通知
+        if (!looksLikeSms(title, text, bigText, sbn.packageName, settings.onlySmsApps)) return
 
         val code = CodeExtractor.extract(full, settings.customRegex) ?: return
 
@@ -149,11 +149,14 @@ class SmsNotificationListener : NotificationListenerService() {
         }.start()
     }
 
-    private fun looksLikeSms(title: String?, text: String?, bigText: String?, pkg: String): Boolean {
+    private fun looksLikeSms(title: String?, text: String?, bigText: String?, pkg: String, smsOnly: Boolean): Boolean {
+        // 仅转发系统短信：先按短信应用包名匹配
+        if (pkg in SMS_PACKAGES) return true
+        // 默认不再转发微信/QQ 等应用通知；只有关闭「仅短信验证码」后才按关键词匹配应用通知
+        if (smsOnly) return false
         val joined = "$title $text $bigText"
         val keywords = listOf("验证码", "校验码", "动态码", "安全码", "确认码", "登录码", "短信", "SMSCode", "verification", "code")
-        if (keywords.any { joined.contains(it, ignoreCase = true) }) return true
-        return pkg in SMS_PACKAGES
+        return keywords.any { joined.contains(it, ignoreCase = true) }
     }
 
     private fun friendlyAppName(pkg: String): String = when (pkg) {
@@ -168,15 +171,13 @@ class SmsNotificationListener : NotificationListenerService() {
     companion object {
         private const val HEARTBEAT_MS = 30_000L
         private val SMS_PACKAGES = setOf(
-            "com.android.mms",
-            "com.android.messaging",
-            "com.google.android.apps.messaging",
-            "com.tencent.mm",
-            "com.tencent.mobileqq",
-            "com.alibaba.android.rimet",
-            "com.ss.android.lark",
-            "com.whatsapp",
-            "org.thoughtcrime.securesms",
+            "com.android.mms",                       // AOSP / MIUI / ColorOS / OriginOS
+            "com.android.messaging",                 // AOSP 旧版 / LineageOS
+            "com.google.android.apps.messaging",     // Google Messages
+            "com.samsung.android.messaging",         // Samsung Messages
+            "com.huawei.mms",                        // 华为信息
+            "com.hihonor.mms",                       // 荣耀信息
+            "com.oneplus.mms",                       // OnePlus 信息
         )
     }
 }

@@ -296,10 +296,27 @@ object CodeSender {
         return try {
             val raw = c.getSharedPreferences(CACHE_PREFS, Context.MODE_PRIVATE)
                 .getString(CACHE_KEY, "") ?: ""
-            JSONArray(raw)
+            val parsed = JSONArray(raw)
+            // 清理旧版本「发送测试码」按钮遗留的缓存（防止恢复连接后反复补发 123456 测试码）
+            val filtered = JSONArray()
+            for (i in 0 until parsed.length()) {
+                val o = parsed.optJSONObject(i) ?: continue
+                if (isTestEntry(o)) continue
+                filtered.put(o)
+            }
+            if (filtered.length() != parsed.length()) saveCache(filtered)
+            filtered
         } catch (_: Exception) {
             JSONArray()
         }
+    }
+
+    /** 判断是否为历史测试码（旧版「发送测试码」按钮产生的缓存条目） */
+    private fun isTestEntry(o: JSONObject): Boolean {
+        val app = o.optString("app")
+        val code = o.optString("code")
+        val source = o.optString("source")
+        return app == "测试" || app == "Test" || (code == "123456" && source == "0000")
     }
 
     private fun saveCache(list: JSONArray) {

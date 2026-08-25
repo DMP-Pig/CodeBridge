@@ -37,7 +37,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
@@ -61,9 +60,7 @@ import com.phonetopc.copycode.R
 import com.phonetopc.copycode.data.AutoDiscover
 import com.phonetopc.copycode.data.PcConfig
 import com.phonetopc.copycode.data.FoundPc
-import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.Settings as AppSettings
-import com.phonetopc.copycode.service.CodeBubble
 import com.phonetopc.copycode.ui.theme.*
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -94,6 +91,7 @@ fun MainScreen() {
     var relayToken by remember { mutableStateOf(settings.relayToken) }
     var e2eKey by remember { mutableStateOf(settings.e2eKey) }
     var customRegex by remember { mutableStateOf(settings.customRegex) }
+    var onlySmsApps by remember { mutableStateOf(settings.onlySmsApps) }
     var statusMsg by remember { mutableStateOf(context.getString(R.string.status_ready)) }
     var statusOk by remember { mutableStateOf(true) }
     var foundHosts by remember { mutableStateOf<List<FoundPc>?>(null) }
@@ -435,6 +433,12 @@ fun MainScreen() {
                     onCheckedChange = { autoSend = it },
                 )
                 ToggleRow(
+                    title = stringResource(R.string.title_only_sms),
+                    desc = stringResource(R.string.desc_only_sms),
+                    checked = onlySmsApps,
+                    onCheckedChange = { onlySmsApps = it },
+                )
+                ToggleRow(
                     title = stringResource(R.string.title_boot_start),
                     desc = stringResource(R.string.desc_boot_start),
                     checked = bootAutoStart,
@@ -570,13 +574,14 @@ fun MainScreen() {
                         text = stringResource(R.string.save),
                         icon = Icons.Default.Check,
                         accent = true,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         val (saveHost, savePort) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
                         host = saveHost
                         port = savePort.toString()
                         settings.applyActive(saveHost, savePort, token)
                         settings.autoSend = autoSend
+                        settings.onlySmsApps = onlySmsApps
                         settings.bootAutoStart = bootAutoStart
                         settings.cacheOffline = cacheOffline
                         settings.pushToAll = pushAll
@@ -592,31 +597,6 @@ fun MainScreen() {
                         activeIdx = settings.activeIndex()
                         statusMsg = if (settings.isValid()) context.getString(R.string.status_saved) else context.getString(R.string.status_fill_host)
                         statusOk = settings.isValid()
-                    }
-                    GlassButton(
-                        text = stringResource(R.string.send_test),
-                        icon = Icons.Default.Send,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        val (sendHost, sendPort) = parseHostPort(host, port.toIntOrNull() ?: AppSettings.DEFAULT_PORT)
-                        host = sendHost
-                        port = sendPort.toString()
-                        settings.pcHost = sendHost
-                        settings.pcPort = sendPort
-                        settings.token = token
-                        if (!settings.isValid()) {
-                            statusMsg = context.getString(R.string.status_fill_host)
-                            statusOk = false
-                            return@GlassButton
-                        }
-                        statusMsg = context.getString(R.string.status_sending)
-                        scope.launch {
-                            val result = withContext(Dispatchers.IO) {
-                                CodeSender.sendToAll("123456", context.getString(R.string.test_app), "0000")
-                            }
-                            statusMsg = result.message
-                            statusOk = result.ok
-                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -708,16 +688,6 @@ fun MainScreen() {
                     label = stringResource(R.string.bubble_seconds_label),
                     placeholder = "15",
                 )
-                Spacer(Modifier.height(10.dp))
-                GlassButton(
-                    text = stringResource(R.string.test_bubble),
-                    icon = Icons.Default.Notifications,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    CodeBubble.show(context, "123456", context.getString(R.string.test_app))
-                    statusMsg = context.getString(R.string.status_bubble_shown)
-                    statusOk = true
-                }
             }
             GlassCard {
                 CardHeader(Icons.Default.Sms, stringResource(R.string.card_steps))

@@ -43,6 +43,11 @@ class Settings private constructor(context: Context) {
         get() = sp.getBoolean(KEY_AUTO_SEND, true)
         set(v) = sp.edit().putBoolean(KEY_AUTO_SEND, v).apply()
 
+    /** 仅转发系统短信验证码（不转发微信/QQ 等应用通知） */
+    var onlySmsApps: Boolean
+        get() = sp.getBoolean(KEY_SMS_ONLY, true)
+        set(v) = sp.edit().putBoolean(KEY_SMS_ONLY, v).apply()
+
     /** 开机自启：系统启动完成后自动恢复转发 */
     var bootAutoStart: Boolean
         get() = sp.getBoolean(KEY_BOOT_AUTO_START, true)
@@ -230,6 +235,7 @@ class Settings private constructor(context: Context) {
         private const val KEY_PORT = "pc_port"
         private const val KEY_TOKEN = "token"
         private const val KEY_AUTO_SEND = "auto_send"
+        private const val KEY_SMS_ONLY = "sms_only"
         private const val KEY_BOOT_AUTO_START = "boot_auto_start"
         private const val KEY_CACHE_OFFLINE = "cache_offline"
         private const val KEY_RELAY_ENABLED = "relay_enabled"

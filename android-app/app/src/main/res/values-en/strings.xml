@@ -23,6 +23,8 @@
     <string name="token_placeholder">Same as on PC</string>
     <string name="title_auto_forward">Auto forward</string>
     <string name="desc_auto_forward">Automatically send codes to PC</string>
+    <string name="title_only_sms">SMS codes only</string>
+    <string name="desc_only_sms">Only forward system SMS codes; ignore app notifications (WeChat/QQ etc.)</string>
     <string name="title_boot_start">Auto-start on boot</string>
     <string name="desc_boot_start">Resume forwarding after phone restart (notification access required)</string>
     <string name="title_custom_regex">Custom regex (optional)</string>
@@ -33,8 +35,6 @@
     <string name="lan">LAN</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
-    <string name="send_test">Send test code</string>
-    <string name="test_app">Test</string>
     <string name="card_permissions">Permissions &amp; Monitoring</string>
     <string name="notification_access">Notification access</string>
     <string name="desc_na_enabled">Enabled; SMS verification codes are readable</string>
@@ -55,7 +55,6 @@
     <string name="overlay_permission">Overlay permission</string>
     <string name="desc_overlay">Needed to show the code bubble on screen</string>
     <string name="bubble_seconds_label">Display duration (sec)</string>
-    <string name="test_bubble">Test bubble</string>
     <string name="card_steps">How to use</string>
     <string name="steps_text">1. Open the Scan-to-pair QR code in CodeBridge settings on PC\n2. Tap Scan to pair on this page (or enter the address/port/Token manually)\n3. Enable Notification access and grant SMS permission\n4. Keep Auto forward on; codes are pushed automatically</string>
     <string name="enabled">Enabled</string>
@@ -78,7 +77,6 @@
     <string name="status_pc_selected">Selected PC: %1$s</string>
     <string name="status_saved">Settings saved</string>
     <string name="status_sending">Sending...</string>
-    <string name="status_bubble_shown">Test bubble shown</string>
 
     <string name="channel_listener_name">CodeBridge listener</string>
     <string name="channel_listener_desc">Listens for SMS codes in the background and forwards them to PC</string>
