@@ -78,14 +78,14 @@ PC 端「上岛」会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9
 
 ## Version / 版本
 
-Current version: `1.0.4beta1` (local beta, not published to GitHub).
-当前版本：`1.0.4beta1`（本地 Beta，未上传 GitHub）。
+Current version: `1.0.3beta` (local beta, not published to GitHub).
+当前版本：`1.0.3beta`（本地 Beta，未上传 GitHub）。
 
-### 1.0.4beta1
+### 1.0.3beta
 - 修复：移除手机端「发送测试码 / 测试气泡」按钮，彻底解决 PC 反复弹「测试：123456」的问题
 - 修复：自动清理旧版本遗留的断线缓存测试码，不再恢复连接后反复补发 123456
 - 调整：默认只转发系统短信验证码（新增「仅短信验证码」开关），不再转发微信/QQ 等应用通知；仅在关闭该开关后才按关键词转发应用通知
-- 版本号升级：Android versionCode 10 / versionName 1.0.4beta1
+- 版本号升级：Android versionCode 11 / versionName 1.0.3beta
 
 ### 1.0.3
 - 修复：PC 主界面支持鼠标滚轮滚动（子卡片防压缩、历史列表自适应高度）
