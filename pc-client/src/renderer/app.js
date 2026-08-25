@@ -55,7 +55,6 @@ const els = {
   setIslandShowApp: $('#setIslandShowApp'),
   setIslandTypeBadge: $('#setIslandTypeBadge'),
   setIslandAnimation: $('#setIslandAnimation'),
-  setIslandClickAction: $('#setIslandClickAction'),
   setIslandDisplay: $('#setIslandDisplay'),
   islandIconPresets: $('#islandIconPresets'),
   islandPreview: $('#islandPreview'),
@@ -77,7 +76,6 @@ const els = {
   setSystemNotify: $('#setSystemNotify'),
   setWebhookEnabled: $('#setWebhookEnabled'),
   setAutoLaunch: $('#setAutoLaunch'),
-  setAutoInputSelected: $('#setAutoInputSelected'),
   heroExpiry: $('#heroExpiry'),
   setCodeExpiry: $('#setCodeExpiry'),
   setCodeDefaultExpiry: $('#setCodeDefaultExpiry'),
@@ -244,7 +242,6 @@ const I18N = {
     'set.copyRestore': '复制后恢复原剪贴板', 'set.copyRestoreDesc': '复制验证码后，过一段时间自动恢复为之前的剪贴板内容',
     'set.copyRestoreSecs': '恢复时间（秒）', 'set.copyRestoreSecsDesc': '复制验证码 N 秒后恢复原剪贴板',
     'set.autoIsland': '自动上岛', 'set.autoIslandDesc': '收到后自动推送到 WinIsland 灵动岛',
-    'set.autoInputSelected': '选中输入框自动输入', 'set.autoInputSelectedDesc': '收到验证码后，若焦点在输入框上则自动输入',
     'set.sound': '提示音', 'set.soundDesc': '收到验证码时播放系统提示音',
     'set.systemNotify': '系统通知', 'set.systemNotifyDesc': '收到验证码时发送 Windows/macOS 系统通知',
     'set.notifyActions': '通知操作按钮', 'set.notifyActionsDesc': '系统通知直接带「复制 / 上岛 / 忽略」按钮',
@@ -281,8 +278,7 @@ const I18N = {
     'set.islandPreviewBody': '验证码 · 来自 短信',
     'btn.playPreview': '播放动画',
     'set.islandAnimation': '上岛动画', 'set.islandAnimationDesc': '选择上岛进入动画：默认 / 淡入 / 滑动 / 缩放',
-    'anim.default': '默认（弹性缩放）', 'anim.fade': '淡入',     'set.islandClickAction': '上岛点击行为', 'set.islandClickActionDesc': '点击灵动岛按钮后：复制验证码到剪贴板，或自动输入到当前输入框',
-    'click.copy': '复制到剪贴板', 'click.type': '输入到当前输入框',
+    'anim.default': '默认（弹性缩放）', 'anim.fade': '淡入',
     'set.islandDisplay': '窗口显示屏幕', 'set.islandDisplayDesc': '主窗口打开的屏幕（跟随鼠标或指定显示器）；灵动岛实际屏幕由 WinIsland 窗口位置决定',
     'display.auto': '自动（跟随鼠标所在屏幕）',
 'anim.slide': '底部滑入', 'anim.scale': '轻微缩放',
@@ -361,7 +357,6 @@ const I18N = {
     'set.copyRestore': 'Restore Original Clipboard', 'set.copyRestoreDesc': 'Restore previous clipboard content after a delay',
     'set.copyRestoreSecs': 'Restore After (s)', 'set.copyRestoreSecsDesc': 'Seconds before restoring original clipboard',
     'set.autoIsland': 'Auto Island', 'set.autoIslandDesc': 'Push to WinIsland automatically',
-    'set.autoInputSelected': 'Type into Selected Input', 'set.autoInputSelectedDesc': 'Auto-type the code when an input box is focused',
     'set.sound': 'Sound', 'set.soundDesc': 'Play system beep on arrival',
     'set.systemNotify': 'System Notification', 'set.systemNotifyDesc': 'Send a system notification on arrival',
     'set.notifyActions': 'Notification Action Buttons', 'set.notifyActionsDesc': 'Show Copy / Island / Ignore buttons right in the notification',
@@ -399,8 +394,6 @@ const I18N = {
     'btn.playPreview': 'Play animation',
     'set.islandAnimation': 'Island Animation', 'set.islandAnimationDesc': 'Choose island enter animation: default / fade / slide / scale',
     'anim.default': 'Default (spring)', 'anim.fade': 'Fade', 'anim.slide': 'Slide up', 'anim.scale': 'Scale',
-    'set.islandClickAction': 'Island Click Action', 'set.islandClickActionDesc': 'When the island button is clicked: copy the code, or type it into the focused input',
-    'click.copy': 'Copy to clipboard', 'click.type': 'Type into focused input',
     'set.islandDisplay': 'Window Display', 'set.islandDisplayDesc': 'Display for the main window (follow mouse or pick one); island display follows the WinIsland window position',
     'display.auto': 'Auto (follow mouse display)',
     'set.checkUpdate': 'Check Update', 'set.checkUpdateDesc': 'Check GitHub for a newer version',
@@ -875,7 +868,6 @@ function fillSettingsForm() {
   $('#setCopyRestoreEnabled').checked = !!s.behavior?.autoCopyRestoreEnabled;
   syncRestoreSecsEnabled();
   $('#setAutoIsland').checked = !!s.behavior?.autoIsland;
-  $('#setAutoInputSelected').checked = !!s.behavior?.autoInputSelected;
   $('#setSound').checked = !!s.behavior?.playSound;
   $('#setSystemNotify').checked = !!s.behavior?.systemNotify;
   $('#setNotifyActions').checked = s.behavior?.systemNotifyActions !== false;
@@ -913,7 +905,6 @@ function fillSettingsForm() {
   $('#setIslandShowApp').checked = s.island?.showAppInBody !== false;
   $('#setIslandTypeBadge').checked = s.island?.typeBadge !== false;
   $('#setIslandAnimation').value = s.island?.animation || 'default';
-  $('#setIslandClickAction').value = s.island?.clickAction || 'copy';
   $('#setIslandDisplay').value = String(s.island?.displayIndex ?? -1);
   renderPlatformTemplates();
 
@@ -1087,7 +1078,6 @@ async function saveSettings() {
       autoCopyRestoreEnabled: $('#setCopyRestoreEnabled').checked,
       autoCopyRestoreSeconds: clamp(parseInt($('#setCopyRestore').value, 10), 0, 3600),
       autoIsland: $('#setAutoIsland').checked,
-      autoInputSelected: $('#setAutoInputSelected').checked,
       playSound: $('#setSound').checked,
       systemNotify: $('#setSystemNotify').checked,
       systemNotifyActions: $('#setNotifyActions').checked,
@@ -1121,7 +1111,6 @@ async function saveSettings() {
       showAppInBody: $('#setIslandShowApp').checked,
       typeBadge: $('#setIslandTypeBadge').checked,
       animation: $('#setIslandAnimation').value || 'default',
-      clickAction: $('#setIslandClickAction').value === 'type' ? 'type' : 'copy',
       displayIndex: parseInt(els.setIslandDisplay.value, 10) || -1,
     },
     ui: {

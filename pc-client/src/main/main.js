@@ -49,7 +49,6 @@ const DEFAULT_SETTINGS = {
     playSound: true,        // 收到验证码播放提示音
     systemNotify: true,     // 收到验证码发送系统通知
     systemNotifyActions: true, // 系统通知带「复制 / 上岛 / 忽略」按钮
-    autoInputSelected: false, // 收到验证码后，若焦点在输入框上则自动输入
     webhookEnabled: false,  // 验证码到达时调用 Webhook
     webhookUrl: '',         // Webhook URL（POST JSON）
     commandPath: '',        // 自定义命令/脚本路径
@@ -88,7 +87,6 @@ const DEFAULT_SETTINGS = {
     typeBadge: true,        // 上岛标题/正文显示验证码类型徽标
     showAppInBody: true,    // 展开正文是否包含来源应用
     animation: 'slide',     // 上岛动画：default | fade | slide | scale
-    clickAction: 'copy',    // 上岛点击行为：copy | type
     displayIndex: -1,       // 目标显示器索引（-1=自动/主屏）
   },
   ui: {
@@ -417,9 +415,9 @@ function buildIslandPayload(entry) {
     id: `phonetopc-${entry.id}`,
     buttons: [
       {
-        label: settings.island.clickAction === 'type' ? '输入' : '复制',
+        label: '复制',
         action: 'launch',
-        value: `${process.execPath} ${settings.island.clickAction === 'type' ? '--type-last' : '--copy-last'}`,
+        value: `${process.execPath} --copy-last`,
       },
     ],
   };
@@ -845,148 +843,6 @@ setInterval(() => {
   broadcastDevices();
 }, 30000);
 
-function escapeSendKeys(s) {
-  const special = ['+', '^', '%', '~', '(', ')', '[', ']', '<', '>'];
-  let out = '';
-  for (const ch of String(s)) {
-    if (ch === '{') out += '{{}';
-    else if (ch === '}') out += '{}}';
-    else if (special.includes(ch)) out += `{${ch}}`;
-    else out += ch;
-  }
-  return out;
-}
-
-function simulateTyping(text) {
-  const t = String(text || '');
-  if (!t) return;
-  if (process.platform === 'win32') {
-    const psFile = path.join(os.tmpdir(), `cb_type_${Date.now()}_${Math.floor(Math.random() * 1e6)}.ps1`);
-    const keys = escapeSendKeys(t).replace(/'/g, "''");
-    const script = `$w = New-Object -ComObject WScript.Shell\n$w.SendKeys('${keys}')\n`;
-    try {
-      fs.writeFileSync(psFile, '\ufeff' + script, 'utf16le');
-      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', psFile], () => {
-        try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
-      });
-    } catch (err) {
-      console.error('自动输入失败:', err);
-      try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
-    }
-  } else if (process.platform === 'darwin') {
-    const script = `tell application "System Events" to keystroke ${JSON.stringify(t)}`;
-    execFile('osascript', ['-e', script], (err) => {
-      if (err) console.error('自动输入失败(macOS):', err.message);
-    });
-  } else if (process.platform === 'linux') {
-    execFile('xdotool', ['type', '--delay', '40', t], (err) => {
-      if (err) console.error('自动输入失败(Linux):', err.message);
-    });
-  }
-}
-
-/**
- * 检测当前是否有「选中的输入框」：焦点是否在可编辑文本框上（跨平台）。
- * Windows: PowerShell UI Automation 检测焦点元素是否为 Edit/Document
- * macOS:   osascript System Events 检测 AXFocusedUIElement 角色
- * Linux:   xdotool 可用时视为可输入（无法可靠判断焦点元素类型）
- * 回调参数为 true 表示当前焦点在输入框上。
- */
-function hasSelectedInput(cb) {
-  const done = typeof cb === 'function' ? cb : () => {};
-  if (process.platform === 'win32') {
-    const psFile = path.join(os.tmpdir(), `cb_focus_${Date.now()}_${Math.floor(Math.random() * 1e6)}.ps1`);
-    const script = [
-      '$ErrorActionPreference = "SilentlyContinue"',
-      'Add-Type -AssemblyName UIAutomationClient',
-      'Add-Type -AssemblyName UIAutomationTypes',
-      'Add-Type -AssemblyName System.Drawing',
-      '$yes = $false',
-      'try {',
-      '  $f = [System.Windows.Automation.AutomationElement]::FocusedElement',
-      '  if ($null -ne $f) {',
-      '    $ct = $f.Current.ControlType.ProgrammaticName',
-      '    if ($ct -match "Edit|Document") { $yes = $true }',
-      '  }',
-      '} catch { }',
-      'if (-not $yes) {',
-      '  Add-Type @"',
-      '  using System;',
-      '  using System.Runtime.InteropServices;',
-      '  using System.Text;',
-      '  public struct GUITHREADINFO {',
-      '    public int cbSize;',
-      '    public uint flags;',
-      '    public IntPtr hwndActive;',
-      '    public IntPtr hwndFocus;',
-      '    public IntPtr hwndCapture;',
-      '    public IntPtr hwndMenuOwner;',
-      '    public IntPtr hwndMoveSize;',
-      '    public IntPtr hwndCaret;',
-      '    public System.Drawing.Rectangle rcCaret;',
-      '  }',
-      '  public class Win32UI {',
-      '    [DllImport("user32.dll")] public static extern bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);',
-      '    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
-      '    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);',
-      '    [DllImport("user32.dll", CharSet=CharSet.Auto)] public static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);',
-      '  }',
-      '"@',
-      '  try {',
-      '    $fg = [Win32UI]::GetForegroundWindow()',
-      '    if ($fg -ne [IntPtr]::Zero) {',
-      '      $procId = 0',
-      '      $tid = [Win32UI]::GetWindowThreadProcessId($fg, [ref]$procId)',
-      '      $gui = New-Object GUITHREADINFO',
-      '      $gui.cbSize = [System.Runtime.InteropServices.Marshal]::SizeOf($gui)',
-      '      if ([Win32UI]::GetGUIThreadInfo($tid, [ref]$gui)) {',
-      '        if ($gui.hwndFocus -ne [IntPtr]::Zero) {',
-      '          $sb = New-Object System.Text.StringBuilder 256',
-      '          [void][Win32UI]::GetClassName($gui.hwndFocus, $sb, 256)',
-      '          $cls = $sb.ToString()',
-      '          if ($cls -match "Edit|RichEdit|TextBox|Document|Input") { $yes = $true }',
-      '        }',
-      '      }',
-      '    }',
-      '  } catch { }',
-      '}',
-      'if ($yes) { Write-Output "YES" } else { Write-Output "NO" }',
-    ].join('\n');
-    try {
-      fs.writeFileSync(psFile, '\ufeff' + script, 'utf16le');
-      execFile('powershell.exe', ['-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-File', psFile], { timeout: 10000 }, (err, stdout) => {
-        try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
-        done(!err && /YES/.test(String(stdout || '')));
-      });
-    } catch (err) {
-      try { fs.unlinkSync(psFile); } catch (e) { /* ignore */ }
-      done(false);
-    }
-  } else if (process.platform === 'darwin') {
-    const script = [
-      'set role to ""',
-      'try',
-      '  tell application "System Events"',
-      '    set frontProc to first process whose frontmost is true',
-      '    set fe to value of attribute "AXFocusedUIElement" of frontProc',
-      '    set role to role of fe',
-      '  end tell',
-      'end try',
-      'return (role is "AXTextField" or role is "AXTextArea" or role is "AXComboBox" or role is "AXSearchField" or role is "AXDocument") as string',
-    ].join('\n');
-    execFile('osascript', ['-e', script], { timeout: 10000 }, (err, stdout) => {
-      done(!err && /true/i.test(String(stdout || '')));
-    });
-  } else if (process.platform === 'linux') {
-    // Linux 无法可靠检测焦点元素类型：若 xdotool 可用则视为有输入框
-    execFile('xdotool', ['--version'], { timeout: 5000 }, (err) => {
-      done(!err);
-    });
-  } else {
-    done(false);
-  }
-}
-
 function handleAutoActions(entry) {
   // 自动复制
   if (settings.behavior.autoCopy) {
@@ -998,16 +854,6 @@ function handleAutoActions(entry) {
     pushToIsland(entry)
       .then(() => emitToRenderer('action:notice', { kind: 'island', text: mainT('已自动上岛', 'Auto-pushed to island') }))
       .catch((err) => emitToRenderer('action:notice', { kind: 'error', text: err.message }));
-  }
-  // 选中输入框自动输入：先检测焦点是否在可编辑输入框上，是才输入
-  if (settings.behavior.autoInputSelected) {
-    setTimeout(() => {
-      hasSelectedInput((ok) => {
-        if (!ok) return;
-        simulateTyping(entry.code);
-        emitToRenderer('action:notice', { kind: 'input', text: mainT('已自动输入验证码', 'Code typed automatically') });
-      });
-    }, 600);
   }
   // Webhook / 脚本触发
   if (settings.behavior.webhookEnabled) {
@@ -1714,8 +1560,7 @@ function registerIpc() {
 }
 
 // ---------------------------------------------------------------- 生命周期
-// 单实例：再次运行 exe 时恢复主窗口（--copy-last / --type-last 副本模式除外）
-if (!process.argv.includes('--copy-last') && !process.argv.includes('--type-last')) {
+if (!process.argv.includes('--copy-last')) {
   const gotLock = app.requestSingleInstanceLock();
   if (!gotLock) {
     app.quit();
@@ -1732,15 +1577,8 @@ if (!process.argv.includes('--copy-last') && !process.argv.includes('--type-last
   }
 }
 
-// 被 WinIsland 灵动岛按钮启动：把最后一条验证码输入到当前聚焦输入框后退出
-if (process.argv.includes('--type-last')) {
-  app.whenReady().then(() => {
-    loadHistory();
-    if (codeHistory[0]) simulateTyping(codeHistory[0].code);
-    app.exit(0);
-  });
-} else if (process.argv.includes('--copy-last')) {
 // 被 WinIsland 灵动岛按钮启动：把最后一条验证码复制到剪贴板后退出
+if (process.argv.includes('--copy-last')) {
   app.whenReady().then(() => {
     loadHistory();
     loadClipboardHistory();
