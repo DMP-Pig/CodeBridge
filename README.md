@@ -78,15 +78,22 @@ PC 端「上岛」会调用 WinIsland 的上岛 API（默认 `http://127.0.0.1:9
 
 ## Version / 版本
 
-Current version: `1.0.3beta1` (local beta). Beta builds stay local only; official releases are published to GitHub.
-当前版本：`1.0.3beta1`（本地 Beta）。Beta 版本仅本地保留，正式版上传 GitHub。
+Current version: `1.0.3` (official release, published on GitHub).
+当前版本：`1.0.3`（正式版，已发布至 GitHub）。
 
-### 1.0.3beta1
+### 1.0.3
+- 修复：PC 主界面支持鼠标滚轮滚动（子卡片防压缩、历史列表自适应高度）
+- 修复：扫码配对二维码 host 取到对象导致手机连不上（改用 address 并优先局域网网段），二维码提示显示 IP 地址、生成失败提示
+- 手机端扫码配对严格校验 host、相机打开失败提示
 - 多 PC 推送：同时推送至所有已配置 PC，可在手机端设置中开关
 - 连接健康面板、验证码类型上岛样式、平台模板库
 - 历史按天分组（今日/昨天/更早）、周报/月报、历史摘要分享
 - 引导选中输入框后自动输入验证码、PC 反向剪贴板已移除
 
+### 1.0.2
+- 新增剪贴板自动恢复：收到验证码自动复制，N 秒后恢复为原剪贴板内容（可配置）
+- 主界面支持鼠标滚轮滚动、扫码配对优化、自动搜索局域网 PC 并去重
+- 新增 Web 控制台、桌面小组件、统计面板、剪贴板历史
 
 ## License / 许可
 
