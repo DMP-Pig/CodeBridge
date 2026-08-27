@@ -42,3 +42,6 @@ __pycache__/
 
 
 # verify artifacts.verify/
+
+# CodeBridge website source (deployed to Cloudflare Pages, not committed)
+website/
