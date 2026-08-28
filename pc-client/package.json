@@ -1,7 +1,7 @@
 {
   "name": "phonetopccopycode-pc",
   "productName": "CodeBridge",
-  "version": "1.0.4beta1",
+  "version": "1.0.4",
   "description": "Bridge SMS verification codes from your phone to PC over LAN. Display, one-click copy, fully configurable. Modern glassmorphism UI.",
   "main": "src/main/main.js",
   "author": {
