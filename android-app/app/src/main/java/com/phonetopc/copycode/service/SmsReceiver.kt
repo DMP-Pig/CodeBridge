@@ -23,13 +23,20 @@ class SmsReceiver : BroadcastReceiver() {
         if (intent.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
         Tls.init(context)
         CodeSender.init(context)
-        val settings = Settings.get()
+        val settings = try {
+            Settings.get()
+        } catch (_: IllegalStateException) {
+            Settings.init(context)
+        }
         if (!settings.autoSend || !settings.isValid()) return
 
         val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
         val sender = messages.firstOrNull()?.originatingAddress ?: ""
         val body = messages.joinToString("") { it.messageBody ?: "" }
         if (body.isBlank()) return
+
+        // 运营商/银行服务短号（10086 等）不作为验证码来源
+        if (CodeExtractor.isServiceSender(sender)) return
 
         val code = CodeExtractor.extract(body, settings.customRegex) ?: return
         CodeBubble.show(context, code, context.getString(R.string.app_sms))

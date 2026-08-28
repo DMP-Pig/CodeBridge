@@ -337,6 +337,7 @@ html[data-theme="light"] .clip-row:hover { background: rgba(18, 28, 60, 0.1); }
   box-shadow: 0 8px 22px rgba(0,0,0,0.28);
 }
 .pair-qr-hint { font-size: 11px; color: var(--text-faint); text-align: center; word-break: break-all; max-width: 100%; }
+.pair-code-big { font-size: 34px; font-weight: 700; letter-spacing: 8px; color: var(--accent, #6ea8ff); font-variant-numeric: tabular-nums; padding: 10px 18px; border: 1px dashed var(--border, rgba(255,255,255,.18)); border-radius: 14px; background: rgba(127,127,127,.08); }
 
 /* ---------------- 按钮 ---------------- */
 .glass-btn {

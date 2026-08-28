@@ -94,7 +94,7 @@ const DEFAULT_SETTINGS = {
     keepHistory: 50,        // 保留历史条数
     autoCleanDays: 7,       // 自动清理天数（0=关闭）
     clipboardHistoryMax: 100,   // 剪贴板历史保留条数
-    theme: 'dark',          // 'dark' | 'light' 深浅色主题
+    theme: 'dark',          // 'dark' | 'light' | 'system' 深浅色主题（跟随系统）
     language: 'zh',         // 'zh' | 'en' 界面语言
     floatWindow: true,      // 收到验证码时显示置顶悬浮窗
     floatWindowPosition: 'top-right',  // 悬浮窗位置: top-right | top-left | bottom-right | bottom-left
@@ -125,6 +125,8 @@ function loadDeviceId() {
 loadDeviceId();
 
 let codeHistory = [];       // 最新在前
+// 临时授权码配对（功能 17）：PC 生成 6 位授权码，30 秒有效；手机端输入后经 /health 读取 token/port 自动配对
+let pairingTicket = null;   // { code, expireAt, token, port }
 const devices = new Map();   // 设备在线状态：deviceId -> 最近心跳信息
 let server = null;
 let mainWindow = null;
@@ -608,6 +610,8 @@ async function ingestCode(body, remoteAddr) {
     app: String(body.app || '短信').slice(0, 40),
     source: String(body.source || '').slice(0, 40),
     from: remoteAddr || '',
+    deviceName: String(body.deviceName || body.name || '').slice(0, 40),
+    deviceId: String(body.deviceId || body.id || '').slice(0, 64),
     time: (Number(body.originalTime) > 0 ? new Date(Number(body.originalTime)) : new Date()).toISOString(),
     cacheSent,
     expireSeconds,
@@ -633,7 +637,14 @@ async function handleRequest(req, res) {
   const pathname = url.pathname.replace(/\/+$/, '') || '/';
 
   if (req.method === 'GET' && pathname === '/health') {
-    return sendJson(res, 200, { ok: true, name: APP_NAME, version: APP_VERSION, id: deviceId, hostname: os.hostname(), time: new Date().toISOString() });
+    const tkt = currentPairingTicket();
+    return sendJson(res, 200, {
+      ok: true, name: APP_NAME, version: APP_VERSION, id: deviceId, hostname: os.hostname(),
+      time: new Date().toISOString(),
+      pairCode: tkt ? tkt.code : '',
+      pairToken: tkt ? tkt.token : '',
+      pairPort: tkt ? tkt.port : 0,
+    });
   }
 
   // 端口 Web 控制台（/ 或 /web）
@@ -1276,8 +1287,8 @@ function csvEscape(v) {
   return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 function historyToCsv(list) {
-  const head = ['id', 'code', 'app', 'source', 'from', 'time'];
-  const rows = (list || []).map((e) => [e.id, e.code, e.app, e.source, e.from, e.time].map(csvEscape).join(','));
+  const head = ['id', 'code', 'app', 'source', 'from', 'device', 'time'];
+  const rows = (list || []).map((e) => [e.id, e.code, e.app, e.source, e.from, e.deviceName || '', e.time].map(csvEscape).join(','));
   return '\uFEFF' + head.join(',') + '\n' + rows.join('\n');
 }
 function parseCsvHistory(text) {
@@ -1331,6 +1342,61 @@ function normalizeImported(raw) {
     });
   }
   return out;
+}
+
+// ---------------------------------------------------------------- 临时授权码配对（功能 17）
+function generatePairingCode() {
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  pairingTicket = {
+    code,
+    expireAt: Date.now() + 30000,
+    token: settings.server.token || '',
+    port: settings.server.port,
+  };
+  return pairingTicket;
+}
+function currentPairingTicket() {
+  if (pairingTicket && pairingTicket.expireAt > Date.now()) {
+    // 令牌 / 端口若在有效期内被修改，则以当前设置为准
+    pairingTicket.token = settings.server.token || '';
+    pairingTicket.port = settings.server.port;
+    return pairingTicket;
+  }
+  pairingTicket = null;
+  return null;
+}
+
+// ---------------------------------------------------------------- 周报 / 月报 CSV（功能 10）
+function reportPeriodLabel(days) {
+  return mainT(days >= 30 ? '\u6708\u62A5' : '\u5468\u62A5', days >= 30 ? 'Monthly report' : 'Weekly report');
+}
+function buildReportCsv(list, days) {
+  const L = [];
+  const push = (arr) => L.push(arr.map(csvEscape).join(','));
+  const t0 = Date.now() - days * 86400000;
+  const fmtD = (ts) => { const d = new Date(ts); return (d.getMonth() + 1) + '/' + d.getDate(); };
+  push([APP_NAME + ' ' + reportPeriodLabel(days), days + 'd']);
+  push([mainT('\u7EDF\u8BA1\u5468\u671F', 'Period'), fmtD(t0) + ' - ' + fmtD(Date.now())]);
+  push([mainT('\u9A8C\u8BC1\u7801\u603B\u6570', 'Total codes'), String(list.length)]);
+  push([mainT('\u6765\u6E90\u5E94\u7528', 'App'), mainT('\u6570\u91CF', 'Count')]);
+  const perApp = new Map();
+  const perDay = new Map();
+  for (const e of list) {
+    const app = String(e.app || mainT('\u77ED\u4FE1', 'SMS'));
+    perApp.set(app, (perApp.get(app) || 0) + 1);
+    const d = new Date(e.time);
+    const dk = (d.getMonth() + 1) + '/' + d.getDate();
+    perDay.set(dk, (perDay.get(dk) || 0) + 1);
+  }
+  for (const [app, n] of [...perApp.entries()].sort((a, b) => b[1] - a[1])) push([app, String(n)]);
+  push([]);
+  push([mainT('\u65E5\u671F', 'Date'), mainT('\u6570\u91CF', 'Count')]);
+  for (const [dk, n] of [...perDay.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) push([dk, String(n)]);
+  push([]);
+  push([mainT('\u660E\u7EC6', 'Details')]);
+  push(['id', 'code', 'app', 'source', 'from', 'device', 'time']);
+  for (const e of list) push([e.id, e.code, e.app, e.source, e.from, e.deviceName || '', e.time]);
+  return '\uFEFF' + L.join('\n');
 }
 
 function registerIpc() {
@@ -1527,6 +1593,37 @@ function registerIpc() {
   ipcMain.handle('shell:open-external', (_e, url) => shell.openExternal(url));
   ipcMain.handle('update:check', () => { checkForUpdates(); return true; });
 
+  // 临时授权码（功能 17）：生成 6 位授权码，30 秒有效；手机端输入后通过 /health 读取配对信息
+  ipcMain.handle('pairing:code-generate', () => {
+    const tkt = generatePairingCode();
+    return { ok: true, code: tkt.code, expiresIn: 30, token: tkt.token, port: tkt.port };
+  });
+  ipcMain.handle('pairing:code-status', () => {
+    const tkt = currentPairingTicket();
+    return tkt ? { ok: true, code: tkt.code, expireAt: tkt.expireAt, token: tkt.token, port: tkt.port } : { ok: false, code: '' };
+  });
+
+  // 周报 / 月报导出 CSV（功能 10）
+  ipcMain.handle('history:export-report', async (_e, days) => {
+    const n = Math.max(1, Math.min(365, Math.floor(Number(days) || 7)));
+    const since = Date.now() - n * 86400000;
+    const list = (codeHistory || []).filter((e) => {
+      const ts = new Date(e && e.time || '').getTime();
+      return !Number.isNaN(ts) && ts >= since;
+    });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    let defDir;
+    try { defDir = app.getPath('downloads'); } catch { defDir = app.getPath('home'); }
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: mainT('\u5bfc\u51fa' + (n >= 30 ? '\u6708\u62a5' : '\u5468\u62a5') + ' CSV', 'Export ' + (n >= 30 ? 'monthly' : 'weekly') + ' report CSV'),
+      defaultPath: path.join(defDir, 'CodeBridge-report-' + n + 'd-' + stamp + '.csv'),
+      filters: [{ name: 'CSV', extensions: ['csv'] }],
+    });
+    if (canceled || !filePath) return { ok: false, canceled: true };
+    fs.writeFileSync(filePath, buildReportCsv(list, n), 'utf8');
+    return { ok: true, path: filePath, count: list.length };
+  });
+
   // 扫码配对：生成包含本机地址 / 端口 / Token 的二维码
   ipcMain.handle('pairing:qr', async () => {
     const ips = getLanIps();
@@ -1540,6 +1637,7 @@ function registerIpc() {
     const payload = {
       app: 'CodeBridge',
       name: APP_NAME,
+      deviceName: os.hostname(),  // 功能 4：扫码后自动作为手机端该 PC 配置的名称
       version: APP_VERSION,
       host,
       port: settings.server.port,

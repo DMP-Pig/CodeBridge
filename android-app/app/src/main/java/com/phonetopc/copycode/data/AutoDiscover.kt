@@ -1,4 +1,4 @@
-﻿package com.phonetopc.copycode.data
+package com.phonetopc.copycode.data
 
 import java.util.Collections
 import org.json.JSONObject
@@ -15,6 +15,12 @@ data class FoundPc(
     val ip: String,
     val id: String,
     val hostname: String,
+    /** 临时授权码（功能 17）：PC 端生成、30 秒内有效；为空表示当前没有激活的授权码 */
+    val pairCode: String = "",
+    /** 配对时返回的访问令牌 */
+    val pairToken: String = "",
+    /** 配对时返回的服务端口（0 表示使用搜索端口） */
+    val pairPort: Int = 0,
 ) {
     /** 是否为 USB/ADB 反向转发通道（127.0.0.1） */
     val isUsb: Boolean get() = ip == "127.0.0.1"
@@ -111,6 +117,9 @@ object AutoDiscover {
                             ip = ip,
                             id = json.optString("id").ifBlank { "ip:$ip" },
                             hostname = json.optString("hostname").ifBlank { "" },
+                            pairCode = json.optString("pairCode", ""),
+                            pairToken = json.optString("pairToken", ""),
+                            pairPort = json.optInt("pairPort", 0),
                         )
                     } else null
                 } else null

@@ -50,7 +50,7 @@ class Settings private constructor(context: Context) {
 
     /** 开机自启：系统启动完成后自动恢复转发 */
     var bootAutoStart: Boolean
-        get() = sp.getBoolean(KEY_BOOT_AUTO_START, true)
+        get() = sp.getBoolean(KEY_BOOT_AUTO_START, false)
         set(v) = sp.edit().putBoolean(KEY_BOOT_AUTO_START, v).apply()
     /** 断线缓存：发送失败时先缓存到本地，恢复连接后自动补发 */
     var cacheOffline: Boolean
@@ -106,6 +106,26 @@ class Settings private constructor(context: Context) {
     var pushToAll: Boolean
         get() = sp.getBoolean(KEY_PUSH_ALL, true)
         set(v) = sp.edit().putBoolean(KEY_PUSH_ALL, v).apply()
+
+    /** 常驻通知/锁屏卡片：把最新验证码显示在常驻服务通知上（功能 7，默认开启） */
+    var noticeLatest: Boolean
+        get() = sp.getBoolean(KEY_NOTICE_LATEST, true)
+        set(v) = sp.edit().putBoolean(KEY_NOTICE_LATEST, v).apply()
+
+    /** 主题模式：system | dark | light（功能 13，默认跟随系统） */
+    var themeMode: String
+        get() = sp.getString(KEY_THEME_MODE, "system") ?: "system"
+        set(v) = sp.edit().putString(KEY_THEME_MODE, if (v in setOf("system", "dark", "light")) v else "system").apply()
+
+    /** 局域网设备白名单开关（功能 16，默认关闭；手机端是主导） */
+    var whitelistEnabled: Boolean
+        get() = sp.getBoolean(KEY_WHITELIST_ENABLED, false)
+        set(v) = sp.edit().putBoolean(KEY_WHITELIST_ENABLED, v).apply()
+
+    /** 白名单内容：PC 配置名或地址，逗号/换行分隔；开启后只向这些 PC 推送 */
+    var whitelistDevices: String
+        get() = sp.getString(KEY_WHITELIST_DEVICES, "") ?: ""
+        set(v) = sp.edit().putString(KEY_WHITELIST_DEVICES, v).apply()
 
 
     // ---------------- 多 PC 配置 ----------------
@@ -248,6 +268,10 @@ class Settings private constructor(context: Context) {
         private const val KEY_CONFIGS = "pc_configs"
         private const val KEY_ACTIVE = "pc_active"
         private const val KEY_PUSH_ALL = "push_all"
+        private const val KEY_NOTICE_LATEST = "notice_latest"
+        private const val KEY_THEME_MODE = "theme_mode"
+        private const val KEY_WHITELIST_ENABLED = "whitelist_enabled"
+        private const val KEY_WHITELIST_DEVICES = "whitelist_devices"
         const val DEFAULT_PORT = 9841
         private const val KEY_FLOAT_BUBBLE = "float_bubble"
         private const val KEY_BUBBLE_SECONDS = "bubble_seconds"

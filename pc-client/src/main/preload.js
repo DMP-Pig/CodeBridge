@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('p2p', {
   getHealth: () => ipcRenderer.invoke('health:snapshot'),
   listDisplays: () => ipcRenderer.invoke('displays:list'),
   exportHistory: (format) => ipcRenderer.invoke('history:export-dialog', format),
+  exportReport: (days) => ipcRenderer.invoke('history:export-report', days),
   importHistory: () => ipcRenderer.invoke('history:import-dialog'),
   listClipboardHistory: () => ipcRenderer.invoke('clipboard-history:list'),
   clearClipboardHistory: () => ipcRenderer.invoke('clipboard-history:clear'),
@@ -32,6 +33,7 @@ contextBridge.exposeInMainWorld('p2p', {
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   hideFloating: () => ipcRenderer.invoke('floating:hide'),
   getPairingQr: () => ipcRenderer.invoke('pairing:qr'),
+  getPairingCode: () => ipcRenderer.invoke('pairing:code-generate'),
   on: (channel, cb) => {
     const allowed = ['code:new', 'server:status', 'action:notice', 'update:result', 'device:status', 'floating:new'];
     if (allowed.includes(channel)) {

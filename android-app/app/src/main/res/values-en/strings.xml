@@ -127,4 +127,37 @@
     <string name="relay_sent">Sent via relay</string>
     <string name="relay_fail">Relay send failed: %1$s</string>
     <string name="e2e_key_label">E2E encryption key (optional)</string>
+    <string name="notif_listener_latest">Latest code: %1$s (from %2$s)</string>
+
+    <string name="send_whitelist_empty">Whitelist is empty, sending blocked</string>
+    <string name="send_whitelist_none">No PC matches the whitelist, sending blocked</string>
+
+    <string name="card_manual">Manual forward</string>
+    <string name="manual_code_label">Code</string>
+    <string name="manual_send">Forward to PC</string>
+    <string name="manual_source">Manual</string>
+    <string name="status_manual_empty">Enter a code first</string>
+    <string name="status_manual_sending">Forwarding…</string>
+    <string name="status_manual_ok">Forwarded code %1$s</string>
+
+    <string name="card_appearance">Appearance</string>
+    <string name="theme_system">Follow system</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_light">Light</string>
+    <string name="title_notice_latest">Show latest code on lock screen</string>
+    <string name="desc_notice_latest">Display the latest code in the persistent notification so it is visible on the lock screen</string>
+
+    <string name="card_pair_code">Temporary pairing code</string>
+    <string name="desc_pair_code">Click "Generate pairing code" on the PC (valid for 30 s), then enter it here to auto-discover and pair with the PC on your LAN.</string>
+    <string name="pair_code_label">Pairing code</string>
+    <string name="pair_start">Pair</string>
+    <string name="status_pair_empty">Enter a pairing code first</string>
+    <string name="status_pair_searching">Searching &amp; pairing…</string>
+    <string name="status_pair_not_found">No PC matches the pairing code (may be expired)</string>
+    <string name="status_pair_ok">Paired: %1$s</string>
+
+    <string name="title_whitelist">LAN device whitelist</string>
+    <string name="desc_whitelist">Only push codes to whitelisted PCs (phone is the source of truth, off by default)</string>
+    <string name="whitelist_label">Whitelist (PC name or address)</string>
+    <string name="whitelist_hint">Separate multiple entries with commas or newlines, e.g. PC 1, 192.168.1.100</string>
 </resources>

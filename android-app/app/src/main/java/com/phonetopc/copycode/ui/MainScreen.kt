@@ -21,6 +21,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material3.*
@@ -59,6 +61,7 @@ import androidx.core.content.ContextCompat
 import com.phonetopc.copycode.R
 import com.phonetopc.copycode.data.AutoDiscover
 import com.phonetopc.copycode.data.PcConfig
+import com.phonetopc.copycode.data.CodeSender
 import com.phonetopc.copycode.data.FoundPc
 import com.phonetopc.copycode.data.Settings as AppSettings
 import com.phonetopc.copycode.ui.theme.*
@@ -111,6 +114,23 @@ fun MainScreen() {
     var bubbleSeconds by remember { mutableStateOf(settings.bubbleSeconds.toString()) }
     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
 
+    // ---- 新增设置状态（功能 1/4/7/13/16/17）----
+    var noticeLatest by remember { mutableStateOf(settings.noticeLatest) }
+    var themeMode by remember { mutableStateOf(settings.themeMode) }
+    var whitelistEnabled by remember { mutableStateOf(settings.whitelistEnabled) }
+    var whitelistDevices by remember { mutableStateOf(settings.whitelistDevices) }
+    var manualCode by remember { mutableStateOf("") }
+    var pairCodeInput by remember { mutableStateOf("") }
+    var pairingBusy by remember { mutableStateOf(false) }
+
+    // 主题模式（功能 13）：跟随系统 / 深色 / 浅色
+    val systemDark = isSystemInDarkTheme()
+    ThemePalette.current = when (themeMode) {
+        "light" -> LightPalette
+        "dark" -> DarkPalette
+        else -> if (systemDark) DarkPalette else LightPalette
+    }
+
     // 从系统设置页返回时刷新权限 / 保活状态
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -153,12 +173,12 @@ fun MainScreen() {
                     throw IllegalArgumentException("not CodeBridge payload")
                 }
                 val p = obj.optInt("port", AppSettings.DEFAULT_PORT).coerceIn(1, 65535)
+                // 功能 4：二维码携带 PC 主机名，扫码后自动作为该配置的名称
+                val qrName = obj.optString("deviceName").ifBlank { obj.optString("name") }.trim()
                 val tk = obj.optString("token")
                 host = h
                 port = p.toString()
                 token = tk
-                settings.applyActive(h, p, tk)
-                configs = settings.pcConfigs()
                 activeIdx = settings.activeIndex()
                 statusMsg = context.getString(R.string.status_qr_ok, "$h:$p")
                 statusOk = true
@@ -507,6 +527,26 @@ fun MainScreen() {
                         placeholder = "\\d{6}",
                     )
                 }
+                ToggleRow(
+                    title = stringResource(R.string.title_whitelist),
+                    desc = stringResource(R.string.desc_whitelist),
+                    checked = whitelistEnabled,
+                    onCheckedChange = { whitelistEnabled = it },
+                )
+                if (whitelistEnabled) {
+                    GlassTextField(
+                        value = whitelistDevices,
+                        onValueChange = { whitelistDevices = it },
+                        label = stringResource(R.string.whitelist_label),
+                        placeholder = "PC 1, 192.168.1.100",
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.whitelist_hint),
+                        color = TextFaint,
+                        fontSize = 11.sp,
+                    )
+                }
                 // 搜索结果：多台 PC 时弹出选择
                 foundHosts?.let { hosts ->
                     AlertDialog(
@@ -564,7 +604,7 @@ fun MainScreen() {
                         confirmButton = {
                             TextButton(onClick = { foundHosts = null }) { Text(stringResource(R.string.cancel), color = Accent) }
                         },
-                        containerColor = Color(0xFF16203A),
+                        containerColor = DialogBg,
                         shape = RoundedCornerShape(18.dp),
                     )
                 }
@@ -593,6 +633,10 @@ fun MainScreen() {
                         settings.customRegex = customRegex
                         settings.floatBubble = floatBubble
                         settings.bubbleSeconds = bubbleSeconds.toIntOrNull() ?: 15
+                        settings.noticeLatest = noticeLatest
+                        settings.themeMode = themeMode
+                        settings.whitelistEnabled = whitelistEnabled
+                        settings.whitelistDevices = whitelistDevices
                         configs = settings.pcConfigs()
                         activeIdx = settings.activeIndex()
                         statusMsg = if (settings.isValid()) context.getString(R.string.status_saved) else context.getString(R.string.status_fill_host)
@@ -606,6 +650,150 @@ fun MainScreen() {
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.Medium,
                 )
+            }
+
+            // 手动转发（功能 1）：手动输入验证码并转发到 PC
+            GlassCard {
+                CardHeader(Icons.Default.Send, stringResource(R.string.card_manual))
+                GlassTextField(
+                    value = manualCode,
+                    onValueChange = { v -> manualCode = v.filter { it.isDigit() }.take(8) },
+                    label = stringResource(R.string.manual_code_label),
+                    placeholder = "123456",
+                )
+                Spacer(Modifier.height(8.dp))
+                GlassButton(
+                    text = stringResource(R.string.manual_send),
+                    icon = Icons.Default.Send,
+                    accent = true,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (manualCode.isBlank()) {
+                        statusMsg = context.getString(R.string.status_manual_empty)
+                        statusOk = false
+                    } else {
+                        val code = manualCode
+                        statusMsg = context.getString(R.string.status_manual_sending)
+                        statusOk = true
+                        scope.launch {
+                            val r = withContext(Dispatchers.IO) {
+                                CodeSender.sendToAll(
+                                    code = code,
+                                    app = context.getString(R.string.app_sms),
+                                    source = context.getString(R.string.manual_source),
+                                )
+                            }
+                            statusMsg = if (r.ok) context.getString(R.string.status_manual_ok, code) else r.message
+                            statusOk = r.ok
+                        }
+                    }
+                }
+            }
+
+            // 外观（功能 13）：跟随系统 / 深色 / 浅色
+            GlassCard {
+                CardHeader(Icons.Default.Settings, stringResource(R.string.card_appearance))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    listOf("system" to stringResource(R.string.theme_system), "dark" to stringResource(R.string.theme_dark), "light" to stringResource(R.string.theme_light)).forEach { (mode, label) ->
+                        val selected = themeMode == mode
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(999.dp))
+                                .background(if (selected) Accent.copy(alpha = 0.30f) else Color(0x14FFFFFF))
+                                .border(
+                                    BorderStroke(1.dp, if (selected) Accent.copy(alpha = 0.75f) else GlassBorder),
+                                    RoundedCornerShape(999.dp),
+                                )
+                                .clickable { themeMode = mode }
+                                .padding(horizontal = 14.dp, vertical = 7.dp),
+                        ) {
+                            Text(
+                                text = label,
+                                color = if (selected) TextPrimary else TextDim,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                ToggleRow(
+                    title = stringResource(R.string.title_notice_latest),
+                    desc = stringResource(R.string.desc_notice_latest),
+                    checked = noticeLatest,
+                    onCheckedChange = { noticeLatest = it },
+                )
+            }
+
+            // 临时授权码配对（功能 17）：PC 端生成 30 秒有效的授权码，手机输入后自动搜索并配对
+            GlassCard {
+                CardHeader(Icons.Default.QrCodeScanner, stringResource(R.string.card_pair_code))
+                Text(
+                    text = stringResource(R.string.desc_pair_code),
+                    color = TextDim,
+                    fontSize = 12.sp,
+                    lineHeight = 18.sp,
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GlassTextField(
+                        value = pairCodeInput,
+                        onValueChange = { v -> pairCodeInput = v.filter { it.isDigit() }.take(8) },
+                        label = stringResource(R.string.pair_code_label),
+                        placeholder = "6 位数字",
+                        modifier = Modifier.weight(1f),
+                    )
+                    GlassButton(
+                        text = stringResource(R.string.pair_start),
+                        icon = Icons.Default.QrCodeScanner,
+                        modifier = Modifier.width(96.dp),
+                    ) {
+                        val code = pairCodeInput.trim()
+                        if (code.isBlank()) {
+                            statusMsg = context.getString(R.string.status_pair_empty)
+                            statusOk = false
+                            return@GlassButton
+                        }
+                        pairingBusy = true
+                        statusMsg = context.getString(R.string.status_pair_searching)
+                        statusOk = true
+                        scope.launch {
+                            val searchPort = port.toIntOrNull() ?: AppSettings.DEFAULT_PORT
+                            val foundList = withContext(Dispatchers.IO) {
+                                AutoDiscover.discoverAll(searchPort)
+                            }
+                            pairingBusy = false
+                            val match = foundList.firstOrNull { it.pairCode == code }
+                            if (match == null) {
+                                statusMsg = context.getString(R.string.status_pair_not_found)
+                                statusOk = false
+                            } else {
+                                host = match.ip
+                                port = (if (match.pairPort > 0) match.pairPort else searchPort).toString()
+                                token = match.pairToken
+                                settings.applyActive(host, port.toIntOrNull() ?: searchPort, token)
+                                configs = settings.pcConfigs()
+                                activeIdx = settings.activeIndex()
+                                pairCodeInput = ""
+                                statusMsg = context.getString(R.string.status_pair_ok, match.ip)
+                                statusOk = true
+                            }
+                        }
+                    }
+                }
+                if (pairingBusy) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.status_pair_searching),
+                        color = TextFaint,
+                        fontSize = 11.sp,
+                    )
+                }
             }
 
             // 权限卡片

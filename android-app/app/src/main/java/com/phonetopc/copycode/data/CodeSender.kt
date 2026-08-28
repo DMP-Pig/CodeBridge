@@ -55,7 +55,18 @@ object CodeSender {
         R.string.send_exception to "异常：%1\$s",
         R.string.heartbeat_ok to "心跳 OK",
         R.string.send_http_err_short to "PC 返回 HTTP %1\$d",
+        R.string.send_whitelist_empty to "白名单为空，已阻止发送",
+        R.string.send_whitelist_none to "没有匹配白名单的 PC，已阻止发送",
     )
+
+    /** 解析白名单：支持逗号/中文逗号/分号/换行分隔 */
+    private fun parseWhitelist(raw: String): Set<String> {
+        if (raw.isBlank()) return emptySet()
+        return raw.split(',', '，', ';', '；', '\n')
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+    }
 
     /** 初始化设备身份（稳定唯一标识，避免重复显示同一台手机） */
     fun init(context: Context) {
@@ -201,9 +212,24 @@ object CodeSender {
             if (!s.pushToAll) {
                 val active = s.pcConfigs().getOrNull(s.activeIndex())
                 if (active == null || active.host.isBlank()) return SendResult(false, str(R.string.send_no_host))
+                // 设备白名单（功能 16，默认关闭）：单 PC 模式同样受白名单约束
+                if (s.whitelistEnabled) {
+                    val allowed = parseWhitelist(s.whitelistDevices)
+                    if (allowed.isEmpty()) return SendResult(false, str(R.string.send_whitelist_empty))
+                    if (active.name !in allowed && active.host !in allowed) {
+                        return SendResult(false, str(R.string.send_whitelist_none))
+                    }
+                }
                 return send(active.host, active.port, active.token, code, app, source, expireSeconds, codeType, originalTime, cacheSent)
             }
-            val targets = s.pcConfigs().filter { it.host.isNotBlank() }
+            var targets = s.pcConfigs().filter { it.host.isNotBlank() }
+            // 设备白名单（功能 16，默认关闭；手机端是主导）：开启后只向白名单内的 PC 推送
+            if (s.whitelistEnabled) {
+                val allowed = parseWhitelist(s.whitelistDevices)
+                if (allowed.isEmpty()) return SendResult(false, str(R.string.send_whitelist_empty))
+                targets = targets.filter { it.name in allowed || it.host in allowed }
+                if (targets.isEmpty()) return SendResult(false, str(R.string.send_whitelist_none))
+            }
             if (targets.isEmpty()) return SendResult(false, str(R.string.send_no_host))
             var okCount = 0
             var firstErr = ""

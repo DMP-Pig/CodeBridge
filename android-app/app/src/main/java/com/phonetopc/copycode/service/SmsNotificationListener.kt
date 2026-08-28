@@ -3,6 +3,7 @@ package com.phonetopc.copycode.service
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -16,17 +17,22 @@ import com.phonetopc.copycode.data.Settings
 import com.phonetopc.copycode.data.Tls
 import com.phonetopc.copycode.R
 import com.phonetopc.copycode.widget.CodeWidgetProvider
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 通知监听服务：读取短信类通知（验证码），提取验证码并转发到 PC。
  * 无需成为默认短信应用；需用户在系统设置中开启「通知使用权」。
+ *
+ * 只推送最新验证码：同一发件人的同一验证码在 60 秒窗口内只推一次（通知重发/旧通知
+ * 未划走时不会重复推送）；通知包含多条短信时取最后（最新）一条验证码。
  */
 class SmsNotificationListener : NotificationListenerService() {
 
-    private val recent = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    /** 去重记录：key = 包名|发件人，value = 最近一次推送的验证码与时间 */
+    private data class LastSend(val code: String, val at: Long)
+
+    private val lastSent = ConcurrentHashMap<String, LastSend>()
     private val handler = Handler(Looper.getMainLooper())
     private val heartbeatStarted = AtomicBoolean(false)
     private val heartbeatRunnable = object : Runnable {
@@ -75,16 +81,40 @@ class SmsNotificationListener : NotificationListenerService() {
                 ).apply { description = getString(R.string.channel_listener_desc) }
                 getSystemService(NotificationManager::class.java).createNotificationChannel(chan)
             }
-            val notif = Notification.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.stat_notify_sync)
-                .setContentTitle(getString(R.string.notif_listener_title))
-                .setContentText(getString(R.string.notif_listener_text))
-                .setOngoing(true)
-                .setCategory(Notification.CATEGORY_SERVICE)
-                .build()
-            startForeground(1001, notif)
+            val notif = buildForegroundNotification(null, "")
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(1001, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            } else {
+                startForeground(1001, notif)
+            }
         } catch (_: Exception) {
             // 前台通知失败不影响通知监听本身
+        }
+    }
+
+    private fun buildForegroundNotification(code: String?, source: String): Notification {
+        val channelId = "codebridge_listener"
+        val showCode = code != null && code.isNotBlank()
+        return Notification.Builder(this, channelId)
+            .setSmallIcon(android.R.drawable.stat_notify_sync)
+            .setContentTitle(getString(R.string.notif_listener_title))
+            .setContentText(
+                if (showCode) getString(R.string.notif_listener_latest, code, source)
+                else getString(R.string.notif_listener_text)
+            )
+            .setOngoing(true)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .build()
+    }
+
+    /** 常驻通知/锁屏卡片：把最新验证码显示在常驻通知上（功能 7，可在设置中关闭） */
+    private fun updateForeground(code: String, source: String) {
+        try {
+            val s = Settings.get()
+            if (!s.noticeLatest) return
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.notify(1001, buildForegroundNotification(code, source))
+        } catch (_: Exception) {
         }
     }
 
@@ -120,18 +150,29 @@ class SmsNotificationListener : NotificationListenerService() {
         // 默认仅处理系统短信验证码，减少误报；关闭「仅短信验证码」后才处理应用通知
         if (!looksLikeSms(title, text, bigText, sbn.packageName, settings.onlySmsApps)) return
 
+        val source = title.ifBlank { sbn.packageName }
+
+        // 运营商/银行服务短号（10086/10010/10000/106 通道等）不作为验证码来源
+        if (CodeExtractor.isServiceSender(source)) return
+
         val code = CodeExtractor.extract(full, settings.customRegex) ?: return
 
-        // 去重：相同 包名+验证码+正文 短时间内只发一次
-        val dedupKey = "${sbn.packageName}|$code|${full.hashCode()}"
-        if (!recent.add(dedupKey)) return
-        if (recent.size > 500) recent.clear()
+        // 去重：同一 包名+发件人+验证码 在 60 秒窗口内只推一次；
+        // 旧短信通知未划走被系统/短信应用重发时，不会再次推送
+        val key = "${sbn.packageName}|$source"
+        val now = System.currentTimeMillis()
+        val prev = lastSent[key]
+        if (prev != null && prev.code == code && now - prev.at < DEDUP_WINDOW_MS) return
+        lastSent[key] = LastSend(code, now)
+        pruneLastSent(now)
+
+        // 常驻通知/锁屏卡片：显示最新验证码（可在设置中关闭）
+        updateForeground(code, source)
 
         // Floating bubble: show the code on the phone screen (tap to copy)
         CodeBubble.show(applicationContext, code, friendlyAppName(sbn.packageName))
         CodeWidgetProvider.notifyNewCode(applicationContext, code, friendlyAppName(sbn.packageName))
 
-        val source = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: sbn.packageName
         val expireSeconds = CodeValidity.parseExpireSeconds(full)
         val codeType = CodeClassifier.classify(full)
         Thread {
@@ -144,9 +185,17 @@ class SmsNotificationListener : NotificationListenerService() {
             )
             if (!result.ok) {
                 // 失败后清除去重，允许重试
-                recent.remove(dedupKey)
+                lastSent.remove(key)
             }
         }.start()
+    }
+
+    private fun pruneLastSent(now: Long) {
+        if (lastSent.size <= 300) return
+        val it = lastSent.entries.iterator()
+        while (it.hasNext()) {
+            if (now - it.next().value.at > DEDUP_WINDOW_MS) it.remove()
+        }
     }
 
     private fun looksLikeSms(title: String?, text: String?, bigText: String?, pkg: String, smsOnly: Boolean): Boolean {
@@ -170,6 +219,7 @@ class SmsNotificationListener : NotificationListenerService() {
 
     companion object {
         private const val HEARTBEAT_MS = 30_000L
+        private const val DEDUP_WINDOW_MS = 60_000L
         private val SMS_PACKAGES = setOf(
             "com.android.mms",                       // AOSP / MIUI / ColorOS / OriginOS
             "com.android.messaging",                 // AOSP 旧版 / LineageOS
@@ -181,4 +231,3 @@ class SmsNotificationListener : NotificationListenerService() {
         )
     }
 }
-

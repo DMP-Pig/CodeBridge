@@ -141,6 +141,7 @@
               <button class="text-btn" id="btnReportWeek" data-i18n="stats.reportWeek">周报</button>
               <button class="text-btn" id="btnReportMonth" data-i18n="stats.reportMonth">月报</button>
               <button class="text-btn" id="btnCopyReport" data-i18n="stats.copyReport">复制报告</button>
+              <button class="text-btn" id="btnExportReport" data-i18n="stats.reportExportCsv">导出报告 CSV</button>
             </div>
           </div>
           <div class="report-output" id="reportOutput"></div>
@@ -216,6 +217,17 @@
         <div class="pair-qr-wrap">
           <img class="pair-qr" id="pairQr" alt="pairing QR" />
           <div class="pair-qr-hint" id="pairQrHint"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-name" data-i18n="set.pairCode">临时授权码</div>
+            <div class="set-desc" data-i18n="set.pairCodeDesc">生成 6 位授权码（30 秒有效），手机端输入后自动配对</div>
+          </div>
+          <button class="pill-btn" id="btnGetPairCode" data-i18n="btn.getPairCode">生成授权码</button>
+        </div>
+        <div class="pair-qr-wrap" id="pairCodeWrap" style="display:none">
+          <div class="pair-code-big" id="pairCodeValue"></div>
+          <div class="pair-qr-hint"><span data-i18n="pair.codeExpire">有效期：</span><span id="pairCodeCountdown"></span></div>
         </div>
         <div class="set-row">
           <div class="set-info">
@@ -579,6 +591,7 @@
           <select class="field select" id="setTheme">
             <option value="dark" data-i18n="theme.dark">深色</option>
             <option value="light" data-i18n="theme.light">浅色</option>
+            <option value="system" data-i18n="theme.system">跟随系统</option>
           </select>
         </div>
         <div class="set-row">

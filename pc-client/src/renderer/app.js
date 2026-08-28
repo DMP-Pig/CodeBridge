@@ -38,6 +38,7 @@ const els = {
   btnReportWeek: $('#btnReportWeek'),
   btnReportMonth: $('#btnReportMonth'),
   btnCopyReport: $('#btnCopyReport'),
+  btnExportReport: $('#btnExportReport'),
   reportOutput: $('#reportOutput'),
   clipboardHistoryList: $('#clipboardHistoryList'),
   btnClearClipboardHistory: $('#btnClearClipboardHistory'),
@@ -94,6 +95,10 @@ const els = {
   pairQr: $('#pairQr'),
   pairQrHint: $('#pairQrHint'),
   btnRefreshQr: $('#btnRefreshQr'),
+  btnGetPairCode: $('#btnGetPairCode'),
+  pairCodeWrap: $('#pairCodeWrap'),
+  pairCodeValue: $('#pairCodeValue'),
+  pairCodeCountdown: $('#pairCodeCountdown'),
 };
 
 let settings = {};
@@ -220,7 +225,7 @@ const I18N = {
     'history.searchPh': '搜索验证码 / 应用 / 来源…', 'history.searchEmpty': '无匹配结果', 'history.cached': '补发',
     'history.actions.copy': '复制到剪贴板', 'history.actions.island': '推送到 WinIsland 灵动岛', 'history.actions.remove': '移除',
     'history.today': '今天', 'history.yesterday': '昨天', 'history.earlier': '更早', 'history.shareSummary': '复制摘要',
-    'stats.reportTitle': '统计报告', 'stats.reportWeek': '周报', 'stats.reportMonth': '月报', 'stats.copyReport': '复制报告', 'stats.reportEmpty': '选择周期生成来源 / 类型汇总', 'stats.reportApps': '来源 TOP', 'stats.reportTypes': '类型分布', 'stats.reportDaily': '每日数量', 'stats.reportNone': '暂无数据', 'stats.reportCopied': '报告已复制',
+    'stats.reportTitle': '统计报告', 'stats.reportWeek': '周报', 'stats.reportMonth': '月报', 'stats.copyReport': '复制报告', 'stats.reportExportCsv': '导出报告 CSV', 'stats.reportExported': '报告已导出', 'stats.reportEmpty': '选择周期生成来源 / 类型汇总', 'stats.reportApps': '来源 TOP', 'stats.reportTypes': '类型分布', 'stats.reportDaily': '每日数量', 'stats.reportNone': '暂无数据', 'stats.reportCopied': '报告已复制',
     'toast.shareSummary': '历史摘要已复制',
     'toast.qrFail': '二维码生成失败，请重试',
     'drawer.title': '设置',
@@ -231,7 +236,7 @@ const I18N = {
     'set.serverEnabled': '启用服务', 'set.serverEnabledDesc': '开启后手机可通过局域网发送验证码',
     'set.port': '监听端口', 'set.portDesc': '修改后服务自动重启',
     'set.token': '访问令牌 Token', 'set.tokenDesc': '手机端需携带相同 Token，防止局域网误连', 'set.tokenPh': '留空则不校验',
-    'set.pair': '扫码配对', 'set.pairDesc': '手机打开 CodeBridge 点「扫码配对」扫一扫，自动填入地址与令牌', 'set.pairRefresh': '刷新二维码',
+    'set.pair': '扫码配对', 'set.pairDesc': '手机打开 CodeBridge 点「扫码配对」扫一扫，自动填入地址与令牌', 'set.pairRefresh': '刷新二维码', 'set.pairCode': '临时授权码', 'set.pairCodeDesc': '生成 6 位授权码（30 秒有效），手机端输入后自动配对', 'btn.getPairCode': '生成授权码', 'pair.codeGenerated': '已生成授权码', 'pair.codeExpire': '有效期：',
     'set.relayEnabled': '公网加密中继', 'set.relayEnabledDesc': '手机与 PC 不在同一局域网时，通过加密中继转发验证码',
     'set.relayUrl': '中继地址', 'set.relayUrlDesc': '需部署 relay-server；如 https://relay.example.com',
     'set.relayRoom': '房间名', 'set.relayRoomDesc': '两端填写相同，建议随机字符串',
@@ -283,7 +288,7 @@ const I18N = {
     'display.auto': '自动（跟随鼠标所在屏幕）',
 'anim.slide': '底部滑入', 'anim.scale': '轻微缩放',
     'set.checkUpdate': '检查更新', 'set.checkUpdateDesc': '检查 GitHub 上是否有新版本',
-    'set.theme': '主题', 'set.themeDesc': '深色/浅色显示模式', 'theme.dark': '深色', 'theme.light': '浅色',
+    'set.theme': '主题', 'set.themeDesc': '深色/浅色/跟随系统显示模式', 'theme.dark': '深色', 'theme.light': '浅色', 'theme.system': '跟随系统',
     'set.language': '语言', 'set.languageDesc': '界面语言', 'lang.zh': '中文', 'lang.en': 'English',
     'set.accent': '强调色', 'set.accentDesc': '按钮与高亮使用的主题色',
     'set.keep': '保留历史条数', 'set.keepDesc': '最多保留的验证码历史数量',
@@ -335,7 +340,7 @@ const I18N = {
     'history.searchPh': 'Search code / app / source…', 'history.searchEmpty': 'No matches', 'history.cached': 'Resent',
     'history.actions.copy': 'Copy to clipboard', 'history.actions.island': 'Push to WinIsland', 'history.actions.remove': 'Remove',
     'history.today': 'Today', 'history.yesterday': 'Yesterday', 'history.earlier': 'Earlier', 'history.shareSummary': 'Copy Summary',
-    'stats.reportTitle': 'Statistics Report', 'stats.reportWeek': 'Weekly', 'stats.reportMonth': 'Monthly', 'stats.copyReport': 'Copy Report', 'stats.reportEmpty': 'Pick a period to summarize sources / types', 'stats.reportApps': 'Top sources', 'stats.reportTypes': 'Type distribution', 'stats.reportDaily': 'Per day', 'stats.reportNone': 'No data', 'stats.reportCopied': 'Report copied',
+    'stats.reportTitle': 'Statistics Report', 'stats.reportWeek': 'Weekly', 'stats.reportMonth': 'Monthly', 'stats.copyReport': 'Copy Report', 'stats.reportExportCsv': 'Export report CSV', 'stats.reportExported': 'Report exported', 'stats.reportEmpty': 'Pick a period to summarize sources / types', 'stats.reportApps': 'Top sources', 'stats.reportTypes': 'Type distribution', 'stats.reportDaily': 'Per day', 'stats.reportNone': 'No data', 'stats.reportCopied': 'Report copied',
     'toast.shareSummary': 'History summary copied',
     'toast.qrFail': 'Failed to generate QR code, please retry',
     'drawer.title': 'Settings',
@@ -346,7 +351,7 @@ const I18N = {
     'set.serverEnabled': 'Enable Service', 'set.serverEnabledDesc': 'Phone can send codes over LAN when enabled',
     'set.port': 'Port', 'set.portDesc': 'Service restarts automatically',
     'set.token': 'Access Token', 'set.tokenDesc': 'Phone must use the same token to prevent wrong connections', 'set.tokenPh': 'Empty = no token check',
-    'set.pair': 'QR Pairing', 'set.pairDesc': 'Open CodeBridge on your phone, tap "Scan QR" and scan to auto-fill address & token', 'set.pairRefresh': 'Refresh QR',
+    'set.pair': 'QR Pairing', 'set.pairDesc': 'Open CodeBridge on your phone, tap "Scan QR" and scan to auto-fill address & token', 'set.pairRefresh': 'Refresh QR', 'set.pairCode': 'Pairing Code', 'set.pairCodeDesc': 'Generate a 6-digit code (valid 30s); enter it on your phone to pair automatically', 'btn.getPairCode': 'Get Pairing Code', 'pair.codeGenerated': 'Pairing code generated', 'pair.codeExpire': 'Valid for: ',
     'set.relayEnabled': 'Public encrypted relay', 'set.relayEnabledDesc': 'Forward codes via encrypted relay when phone & PC are not on the same LAN',
     'set.relayUrl': 'Relay URL', 'set.relayUrlDesc': 'Deploy relay-server; e.g. https://relay.example.com',
     'set.relayRoom': 'Room name', 'set.relayRoomDesc': 'Same on both ends; use a random string',
@@ -397,7 +402,7 @@ const I18N = {
     'set.islandDisplay': 'Window Display', 'set.islandDisplayDesc': 'Display for the main window (follow mouse or pick one); island display follows the WinIsland window position',
     'display.auto': 'Auto (follow mouse display)',
     'set.checkUpdate': 'Check Update', 'set.checkUpdateDesc': 'Check GitHub for a newer version',
-    'set.theme': 'Theme', 'set.themeDesc': 'Dark or light appearance', 'theme.dark': 'Dark', 'theme.light': 'Light',
+    'set.theme': 'Theme', 'set.themeDesc': 'Dark, light or follow system', 'theme.dark': 'Dark', 'theme.light': 'Light', 'theme.system': 'Follow system',
     'set.language': 'Language', 'set.languageDesc': 'Interface language', 'lang.zh': 'Chinese', 'lang.en': 'English',
     'set.accent': 'Accent Color', 'set.accentDesc': 'Color used for buttons & highlights',
     'set.keep': 'History Limit', 'set.keepDesc': 'Max codes kept in history',
@@ -438,8 +443,21 @@ function t(key, vars) {
   return out;
 }
 
+function systemPrefersDark() {
+  return !!window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function resolveTheme() {
+  const th = (settings.ui && settings.ui.theme) || 'dark';
+  if (th === 'system') return systemPrefersDark() ? 'dark' : 'light';
+  return th;
+}
 function applyTheme() {
-  document.documentElement.dataset.theme = (settings.ui && settings.ui.theme) || 'dark';
+  document.documentElement.dataset.theme = resolveTheme();
+}
+if (window.matchMedia) {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const onScheme = () => { if ((settings.ui && settings.ui.theme) === 'system') applyTheme(); };
+  if (mq.addEventListener) mq.addEventListener('change', onScheme); else if (mq.addListener) mq.addListener(onScheme);
 }
 
 function applyI18n() {
@@ -673,7 +691,7 @@ function renderHistory() {
       <div class="history-code">${escapeHtml(entry.code)}</div>
       <div class="history-info">
         <div class="history-app">${escapeHtml(entry.app || t('history.msg.defaultApp'))}${codeTypeBadgeHtml(entry)}${entry.cacheSent ? '<span class="history-badge">' + t('history.cached') + '</span>' : ''}</div>
-        <div class="history-meta">${escapeHtml(entry.source || '')} · ${fmtFull(entry.time)}${entry.from ? ' · ' + escapeHtml(entry.from) : ''}</div>
+        <div class="history-meta">${escapeHtml(entry.source || '')}${entry.deviceName ? ' · ' + escapeHtml(entry.deviceName) : ''} · ${fmtFull(entry.time)}${entry.from ? ' · ' + escapeHtml(entry.from) : ''}</div>
         ${entryRemainMs(entry) === null ? '' : `<span class="history-expiry">${expiryBadgeText(entry)}</span>`}
       </div>
       <div class="history-actions">
@@ -816,6 +834,13 @@ async function copyReport() {
   await api.writeClipboard(text);
   toast('ok', t('stats.reportCopied'));
 }
+async function exportReportCsv() {
+  if (!currentReportMeta) { toast('err', t('stats.reportEmpty')); return; }
+  const res = await api.exportReport(currentReportMeta.days).catch(() => null);
+  if (!res) { toast('err', t('toast.exportErr')); return; }
+  if (res.ok) toast('ok', t('stats.reportExported') + ' (' + res.count + ')');
+  else if (!res.canceled) toast('err', t('toast.exportErr'));
+}
 
 /* ---------------- 历史摘要分享 ---------------- */
 async function shareSummary() {
@@ -855,6 +880,33 @@ async function loadPairQr() {
     parts.push('Token: ' + (qr.payload.token || t('set.tokenPh')));
     els.pairQrHint.textContent = parts.join(' · ');
   } catch (e) { toast('err', t('toast.qrFail')); }
+}
+
+/* ---------------- 临时授权码（功能 17） ---------------- */
+let pairCodeTimer = null;
+async function getPairCode() {
+  const res = await api.getPairingCode().catch(() => null);
+  if (!res || !res.code) { toast('err', t('toast.qrFail')); return; }
+  els.pairCodeValue.textContent = res.code;
+  els.pairCodeWrap.style.display = '';
+  startPairCodeCountdown();
+  toast('ok', t('pair.codeGenerated'));
+}
+function startPairCodeCountdown() {
+  if (pairCodeTimer) clearInterval(pairCodeTimer);
+  const deadline = Date.now() + 30000;
+  const tick = () => {
+    const remain = Math.max(0, deadline - Date.now());
+    const sec = Math.ceil(remain / 1000);
+    if (els.pairCodeCountdown) els.pairCodeCountdown.textContent = sec + 's';
+    if (sec <= 0) {
+      clearInterval(pairCodeTimer);
+      pairCodeTimer = null;
+      if (els.pairCodeWrap) els.pairCodeWrap.style.display = 'none';
+    }
+  };
+  tick();
+  pairCodeTimer = setInterval(tick, 1000);
 }
 
 function fillSettingsForm() {
@@ -1052,7 +1104,8 @@ function syncFloatWindowEnabled() {
 $('#setFloatWindow').addEventListener('change', syncFloatWindowEnabled);
 $('#setTheme').addEventListener('change', () => {
   settings.ui = settings.ui || {};
-  settings.ui.theme = $('#setTheme').value === 'light' ? 'light' : 'dark';
+  const v = $('#setTheme').value;
+  settings.ui.theme = (v === 'dark' || v === 'light' || v === 'system') ? v : 'dark';
   applyTheme();
 });
 $('#setLanguage').addEventListener('change', () => {
@@ -1118,7 +1171,7 @@ async function saveSettings() {
       keepHistory: clamp(parseInt($('#setKeep').value, 10), 10, 500),
       autoCleanDays: clamp(parseInt($('#setAutoClean').value, 10), 0, 365),
       clipboardHistoryMax: clamp(parseInt($('#setClipboardHistoryMax').value, 10), 10, 500),
-      theme: $('#setTheme').value === 'light' ? 'light' : 'dark',
+      theme: (v => (v === 'dark' || v === 'light' || v === 'system') ? v : 'dark')($('#setTheme').value),
       language: $('#setLanguage').value === 'en' ? 'en' : 'zh',
       floatWindow: $('#setFloatWindow').checked,
       floatWindowPosition: $('#setFloatWindowPos').value || 'top-right',
@@ -1205,6 +1258,7 @@ els.btnAddPlatformTemplate.addEventListener('click', addPlatformTemplate);
 els.btnReportWeek.addEventListener('click', () => generateReport(7, 'stats.reportWeek'));
 els.btnReportMonth.addEventListener('click', () => generateReport(30, 'stats.reportMonth'));
 els.btnCopyReport.addEventListener('click', copyReport);
+els.btnExportReport.addEventListener('click', exportReportCsv);
 els.btnShareSummary.addEventListener('click', shareSummary);
 els.btnTestIsland.addEventListener('click', async () => {
   els.btnTestIsland.textContent = t('btn.testingIsland');
@@ -1235,6 +1289,7 @@ els.btnTestWebhook.addEventListener('click', async () => {
   toast('ok', t('toast.webhookTestOk'));
 });
 els.btnRefreshQr.addEventListener('click', loadPairQr);
+els.btnGetPairCode.addEventListener('click', getPairCode);
 $('#setIslandIcon').addEventListener('input', updateIslandPreview);
 $('#setIslandTitleStyle').addEventListener('change', updateIslandPreview);
 $('#setIslandShowApp').addEventListener('change', updateIslandPreview);
@@ -1447,5 +1502,4 @@ async function renderHealth() {
   setInterval(renderHealth, 3000);
   setInterval(tickExpiry, 1000);
 })();
-
 
