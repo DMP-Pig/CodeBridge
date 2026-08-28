@@ -45,3 +45,6 @@ __pycache__/
 
 # CodeBridge website source (deployed to Cloudflare Pages, not committed)
 website/
+
+# Wrangler local cache (Cloudflare Pages deploy)
+.wrangler/
